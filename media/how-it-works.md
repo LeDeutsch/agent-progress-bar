@@ -52,6 +52,10 @@ A finished card (green or red) leaves the list after 2 minutes: the line at its 
 
 Hover the time left to see how it is estimated. **Remove** takes a finished, failed or stuck task off the list. The status bar shows the oldest running task, and `(+2)` when others run too.
 
+## Settings
+
+Click the gear at the top of the panel (or press `Ctrl+,` and type `agent progress`) to change how long a finished task stays, when a task counts as stuck, the notifications, and when old files are deleted. Changes apply right away.
+
 ## Privacy
 
 Everything stays on your computer. The extension reads the progress folder and the logs the tasks point to, and never connects to the network.

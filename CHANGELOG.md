@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- A gear at the top of the panel opens the extension's settings; the README and the guide say where they are.
+
 ## 0.1.1
 
 - A finished task stays 2 minutes in the list (was 5), and a line at the bottom of its card empties until it leaves; cards fade out instead of vanishing.

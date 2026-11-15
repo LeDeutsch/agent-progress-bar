@@ -136,6 +136,8 @@ An agent can also write the JSON file itself, as described above.
 
 ## Settings
 
+Click the gear at the top of the **Agent Progress** panel, or press `Ctrl+,` (`Cmd+,` on macOS) and type `agent progress`. Changes apply right away.
+
 | Setting | Default | |
 |---|---|---|
 | `agentProgress.folder` | `~/.agent-progress` | Folder watched for progress files. |

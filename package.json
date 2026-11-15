@@ -2,7 +2,7 @@
   "name": "agent-progress-bar",
   "displayName": "Agent Progress Bar",
   "description": "A progress bar and the time left for the long tasks your AI agents run in the background, in the status bar and in a panel next to the terminal. Works with any agent, command or script.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "ludwigdinspel",
   "author": "Ludwig Junior Dinspel",
   "license": "MIT",
@@ -81,6 +81,12 @@
         "title": "Cancel the Agent Instructions",
         "category": "Agent Progress",
         "icon": "$(close)"
+      },
+      {
+        "command": "agentProgress.openSettings",
+        "title": "Open Settings",
+        "category": "Agent Progress",
+        "icon": "$(gear)"
       }
     ],
     "viewsContainers": {
@@ -115,6 +121,11 @@
         },
         {
           "command": "agentProgress.howItWorks",
+          "when": "view == agentProgress.view",
+          "group": "navigation"
+        },
+        {
+          "command": "agentProgress.openSettings",
           "when": "view == agentProgress.view",
           "group": "navigation"
         }

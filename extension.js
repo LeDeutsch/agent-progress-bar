@@ -343,6 +343,12 @@ async function addInstructions() {
 }
 
 let extensionUri;
+let extensionId;
+
+/** The Settings editor, showing only this extension's settings. */
+function openSettings() {
+  vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${extensionId}`);
+}
 
 function howItWorks() {
   const guide = vscode.Uri.joinPath(extensionUri, "media", "how-it-works.md");
@@ -414,6 +420,7 @@ function activate(context) {
       provideTextDocumentContent: (uri) => previews.get(uri.path) ?? "",
     }),
     vscode.commands.registerCommand("agentProgress.howItWorks", howItWorks),
+    vscode.commands.registerCommand("agentProgress.openSettings", openSettings),
     vscode.commands.registerCommand("agentProgress.confirmAdd", () => pending?.settle("ok")),
     vscode.commands.registerCommand("agentProgress.cancelAdd", () => pending?.settle("cancel")),
     // Closing the preview answers Cancel.
@@ -431,6 +438,7 @@ function activate(context) {
     }),
   );
   extensionUri = context.extensionUri;
+  extensionId = context.extension.id;
   // The agent-progress command: launchers in a fixed place, and in every terminal VS Code opens.
   const launchers = installLaunchers(context);
   const terminals = context.environmentVariableCollection;
