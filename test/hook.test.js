@@ -157,6 +157,129 @@ test("without a description, the title is the first line of the command", () => 
   assert.equal(hook.idOf(""), null);
 });
 
+/** Like play(), for another tool; `events` are [event, at, eventName]. */
+function playTool(tool, events) {
+  const files = new Map();
+  for (const [event, at, name] of events) {
+    const existing = [...files].map(([id, data]) => ({ id, data }));
+    for (const change of hook.onEvent(event, at, existing, formatDuration, tool, name)) {
+      if (change.onlyIfNew && files.has(change.id)) continue;
+      files.set(change.id, { ...(files.get(change.id) || {}), ...change.data });
+    }
+  }
+  return files;
+}
+const only = (files) => {
+  assert.equal(files.size, 1, `one card, got ${[...files.keys()].join(", ")}`);
+  return [...files.values()][0];
+};
+
+// Shaped like the examples of Codex's hooks page (common fields, Bash tool, tool_use_id).
+const codex = (name, fields = {}) => ({
+  session_id: "s-codex", transcript_path: null, cwd: "/repo", hook_event_name: name, model: "gpt",
+  turn_id: "t1", tool_name: "Bash", tool_use_id: "call_7", tool_input: { command: "cargo test" }, permission_mode: "default", ...fields,
+});
+
+test("Codex: a card from its start to its end, paired by tool_use_id", () => {
+  const card = playTool("codex", [[codex("PreToolUse"), T0], [codex("PostToolUse", { tool_response: { exit_code: 0 } }), later(42)]]).get("codex-call_7");
+  assert.equal(card.source, "Codex");
+  assert.equal(card.title, "cargo test");
+  assert.equal(card.state, "done");
+  assert.equal(card.detail, "finished in 40 s");
+  const failed = playTool("codex", [[codex("PreToolUse"), T0], [codex("PostToolUse", { tool_response: { exit_code: 101 } }), later(9)]]).get("codex-call_7");
+  assert.equal(failed.state, "failed");
+  assert.equal(failed.detail, "exit code 101");
+  const words = playTool("codex", [[codex("PreToolUse", { tool_input: { command: ["npm", "run", "build"] } }), T0]]).get("codex-call_7");
+  assert.equal(words.command, "npm run build", "a command given as a list of words");
+});
+
+test("Codex: the end of a turn ends nothing (a long command ends later), the end of the session does", () => {
+  const start = [[codex("PreToolUse"), T0]];
+  assert.equal(playTool("codex", [...start, [codex("Stop", { stop_hook_active: false }), later(5)]]).get("codex-call_7").state, "running");
+  assert.equal(playTool("codex", [...start, [{ session_id: "s-codex", hook_event_name: "SessionEnd", reason: "other" }, later(5)]]).get("codex-call_7").state, "ended");
+  assert.equal(playTool("codex", [[codex("PreToolUse", { tool_name: "apply_patch" }), T0]]).size, 0, "only shell commands");
+});
+
+// Shaped like Copilot's hooks reference (camelCase payload, no event name in it, toolArgs as JSON text).
+const copilot = (fields = {}) => ({
+  sessionId: "s-cp", timestamp: T0.getTime(), cwd: "C:\\repo", toolName: "powershell",
+  toolArgs: JSON.stringify({ command: "npm test", description: "Run the tests" }), ...fields,
+});
+
+test("GitHub Copilot: no call id, the command finds its card again; the event comes as an argument", () => {
+  const card = only(playTool("copilot", [[copilot(), T0, "preToolUse"], [copilot({ toolResult: { resultType: "success", textResultForLlm: "ok" } }), later(30), "postToolUse"]]));
+  assert.equal(card.source, "GitHub Copilot");
+  assert.equal(card.title, "Run the tests");
+  assert.equal(card.state, "done");
+  assert.equal(card.detail, "finished in 30 s");
+  const failed = only(playTool("copilot", [[copilot(), T0, "preToolUse"], [copilot({ error: "Exit code 1\nnpm ERR!" }), later(3), "postToolUseFailure"]]));
+  assert.equal(failed.state, "failed");
+  assert.equal(failed.detail, "Exit code 1");
+  const bash = only(playTool("copilot", [[copilot({ toolName: "bash", toolArgs: { command: "make" } }), T0, "preToolUse"]]));
+  assert.equal(bash.title, "make", "arguments as an object, the bash tool");
+  assert.equal(playTool("copilot", [[copilot({ toolName: "view" }), T0, "preToolUse"]]).size, 0, "only shell commands");
+});
+
+test("GitHub Copilot: the same command twice, the first to start is the first to end", () => {
+  const files = playTool("copilot", [
+    [copilot(), T0, "preToolUse"],
+    [copilot(), later(5), "preToolUse"],
+    [copilot(), later(20), "postToolUse"],
+  ]);
+  const cards = [...files.values()].sort((a, b) => Date.parse(a.started) - Date.parse(b.started));
+  assert.deepEqual(cards.map((c) => c.state), ["done", "running"]);
+  assert.equal(cards[0].detail, "finished in 20 s");
+  const stopped = playTool("copilot", [[copilot(), T0, "preToolUse"], [{ sessionId: "s-cp", timestamp: 1 }, later(60), "agentStop"]]);
+  assert.equal(only(stopped).state, "ended", "the end of the agent's turn");
+  assert.equal(playTool("copilot", [[copilot(), later(20), "postToolUse"]]).size, 0, "an end without its start writes nothing");
+});
+
+// Shaped like Gemini CLI's hooks reference (base fields, run_shell_command, tool_response).
+const gemini = (name, fields = {}) => ({
+  session_id: "s-gm", transcript_path: "/t", cwd: "/repo", hook_event_name: name, timestamp: T0.toISOString(),
+  tool_name: "run_shell_command", tool_input: { command: "npm run build", description: "Build the site" }, ...fields,
+});
+
+test("Gemini CLI: before and after a shell command, an error fails it, the end of the turn ends the rest", () => {
+  const card = only(playTool("gemini", [[gemini("BeforeTool"), T0], [gemini("AfterTool", { tool_response: { llmContent: "ok", returnDisplay: "ok" } }), later(65)]]));
+  assert.equal(card.source, "Gemini CLI");
+  assert.equal(card.title, "Build the site");
+  assert.equal(card.state, "done");
+  assert.equal(card.detail, "finished in 1 min");
+  const failed = only(playTool("gemini", [[gemini("BeforeTool"), T0], [gemini("AfterTool", { tool_response: { error: { message: "Command exited with code 2" } } }), later(4)]]));
+  assert.equal(failed.state, "failed");
+  assert.equal(failed.detail, "Command exited with code 2");
+  const turn = only(playTool("gemini", [[gemini("BeforeTool"), T0], [{ session_id: "s-gm", hook_event_name: "AfterAgent" }, later(30)]]));
+  assert.equal(turn.state, "ended");
+  assert.equal(playTool("gemini", [[gemini("BeforeTool", { tool_name: "read_file" }), T0]]).size, 0);
+});
+
+test("the hook command for each tool: Gemini gets {} as its answer, the others nothing, and all end well", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-progress-hook-"));
+  const run = (args, event) =>
+    spawnSync(process.execPath, [SCRIPT, "hook", ...args], { input: JSON.stringify(event), env: { ...process.env, AGENT_PROGRESS_DIR: dir }, encoding: "utf8" });
+  const g = run(["gemini"], gemini("BeforeTool"));
+  assert.equal(g.status, 0, g.stderr);
+  assert.equal(g.stdout, "{}");
+  const c = run(["copilot", "preToolUse"], copilot());
+  assert.equal(c.status, 0, c.stderr);
+  assert.equal(c.stdout, "");
+  const x = run(["codex"], codex("PreToolUse"));
+  assert.equal(x.status, 0, x.stderr);
+  const names = fs.readdirSync(dir).sort();
+  assert.deepEqual(names.map((n) => n.split("-")[0]), ["codex", "copilot", "gemini"], names.join(", "));
+  const bom = spawnSync(process.execPath, [SCRIPT, "hook", "codex"], {
+    input: `﻿${JSON.stringify(codex("PreToolUse", { tool_use_id: "call_bom" }))}\r\n`,
+    env: { ...process.env, AGENT_PROGRESS_DIR: dir },
+    encoding: "utf8",
+  });
+  assert.equal(bom.status, 0);
+  assert.ok(fs.existsSync(path.join(dir, "codex-call_bom.json")), "an event passed on by PowerShell (with its byte order mark) is read");
+  const odd = run(["cursor"], {});
+  assert.equal(odd.status, 0, "an unknown tool is ignored, never an error");
+  assert.equal(odd.stdout, "");
+});
+
 test("the agent-progress hook command reads the event on stdin and writes the card", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-progress-hook-"));
   const run = (event) =>

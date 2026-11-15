@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- **Codex, GitHub Copilot and Gemini CLI** connect like Claude Code: hooks in their own settings show every command they run that lasts. Codex: `~/.codex/hooks.json` (Codex asks once to trust the hook: `/hooks`). GitHub Copilot: a file of the extension's own, `~/.copilot/hooks/agent-progress.json`, read by Copilot CLI and VS Code's agent mode; Disconnect deletes it. Gemini CLI: `~/.gemini/settings.json`. Each change shows side by side first.
+- One connect button in the empty panel, whatever the number of agents: the name of the one tool found, or **Connect an agent** (the Connections page) when several are waiting. **Agent Progress: Connect an Agent** and **Disconnect an Agent** in the Command Palette.
+- The Connections page lists the tools on the computer, one row each, with what each one ran today and what is left to do in it.
+- The hook reads events that PowerShell passes on with a byte order mark.
+- Left out for now, with the reason in the README: Cursor, Windsurf, Cline.
+
 ## 0.2.0
 
 - **Connect Claude Code**: hooks in Claude Code's settings show every command it runs that lasts (20 seconds by default, `agentProgress.commandsShowAfterSeconds`), without the agent having to remember anything. Foreground commands turn done or failed; background ones turn **ended** (grey) once Claude Code no longer lists them, since it does not say how they went. The change is shown side by side before it is written; **Disconnect Claude Code** takes it out. The hooks only watch and never slow Claude Code down.

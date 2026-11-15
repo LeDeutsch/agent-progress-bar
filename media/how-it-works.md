@@ -35,9 +35,9 @@ Use `agent-progress fail export --detail "disk full"` if it goes wrong. `set` ke
 
 A script can also write the file itself: see the README for the format.
 
-## With Claude Code
+## With Claude Code, Codex, GitHub Copilot or Gemini CLI
 
-Click **Connect Claude Code** in the empty panel, or run **Agent Progress: Connect Claude Code** from the Command Palette. You see the change to Claude Code's settings before anything is written. From then on, every command Claude Code runs that lasts more than 20 seconds shows here on its own, without Claude having to remember anything. A command it sends to the background turns grey (**ended**) once Claude Code no longer lists it: Claude Code does not say how it went. The account button at the top of the panel opens the **Connections** page: the Claude Code account in use, what it ran today, and **Disconnect** to take it back out. The README shows the hooks to add by hand if your settings file has comments.
+Click the connect button in the empty panel (**Connect Claude Code**, the name of the tool found, or **Connect an agent** when there are several), or run **Agent Progress: Connect an Agent** from the Command Palette. You see the change to the tool's settings before anything is written. From then on, every command it runs that lasts more than 20 seconds shows here on its own, without the agent having to remember anything. A command Claude Code sends to the background turns grey (**ended**) once Claude Code no longer lists it: Claude Code does not say how it went. Codex asks you once to trust the new hook (`/hooks` in Codex). The account button at the top of the panel opens the **Connections** page: one row per tool on your computer, the Claude Code account in use, what each one ran today, and **Disconnect** to take it back out. The README shows the hooks to add by hand if your settings file has comments.
 
 ## With any AI agent
 

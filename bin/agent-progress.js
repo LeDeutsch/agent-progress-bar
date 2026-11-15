@@ -29,7 +29,8 @@ Report progress yourself:
 set keeps the fields it is not given, so "set build --done 42" is enough after the first call.
 Files go in ~/.agent-progress (AGENT_PROGRESS_DIR to change it).
 
-  agent-progress hook   reads a Claude Code hook event on stdin (set up by "Connect Claude Code")`;
+  agent-progress hook [claude|codex|copilot|gemini] [event]
+                        reads an AI coding tool's hook event on stdin (set up by Connect)`;
 
 function folder() {
   return process.env.AGENT_PROGRESS_DIR || path.join(os.homedir(), ".agent-progress");
@@ -184,23 +185,25 @@ function run(options, args) {
 }
 
 /**
- * A Claude Code hook event on stdin (lib/hook.js says what it writes). Prints nothing and never
- * fails: whatever happens, Claude Code goes on as if the hook were not there.
+ * An AI coding tool's hook event on stdin: `agent-progress hook [claude|codex|copilot|gemini]
+ * [event]` (lib/hook.js says what it writes; the event name is given when the tool leaves it out
+ * of the event). Never fails and never says anything the tool would act on: whatever happens,
+ * the tool goes on as if the hook were not there.
  */
-function hook() {
+function hook(tool, eventName) {
   let event;
   try {
-    event = JSON.parse(fs.readFileSync(0, "utf8"));
+    // PowerShell puts a byte order mark before the text it passes on: JSON does not allow it.
+    event = JSON.parse(fs.readFileSync(0, "utf8").replace(/^﻿/, ""));
   } catch {
     return;
   }
+  const agent = hookLib.AGENTS[tool];
+  if (!agent) return;
   const existing = [];
-  const tool = hookLib.idOf(event && event.tool_use_id);
   try {
-    // A command's events need its own card only; the end of a turn or a session needs them all.
-    const names = tool ? [`${tool}.json`] : fs.readdirSync(folder());
-    for (const name of names) {
-      if (!name.startsWith(hookLib.PREFIX) || !name.endsWith(".json")) continue;
+    for (const name of fs.readdirSync(folder())) {
+      if (!name.startsWith(agent.prefix) || !name.endsWith(".json")) continue;
       const id = name.slice(0, -".json".length);
       const data = read(id);
       if (Object.keys(data).length) existing.push({ id, data });
@@ -208,7 +211,7 @@ function hook() {
   } catch {
     // No folder yet.
   }
-  for (const change of hookLib.onEvent(event, new Date(), existing, formatDuration)) {
+  for (const change of hookLib.onEvent(event, new Date(), existing, formatDuration, tool, eventName)) {
     try {
       if (change.onlyIfNew) {
         fs.mkdirSync(folder(), { recursive: true });
@@ -248,11 +251,16 @@ function main(argv) {
 }
 
 if (process.argv[2] === "hook") {
+  // Claude Code's hooks were set up before the tool was named: no name is Claude Code.
+  const tool = process.argv[3] || "claude";
   try {
-    hook();
+    hook(tool, process.argv[4]);
   } catch {
-    // Never in Claude Code's way.
+    // Never in the tool's way.
   }
+  // Gemini CLI reads the hook's answer as JSON: the empty one changes nothing.
+  if (tool === "gemini") process.stdout.write("{}");
+  process.exitCode = 0;
 } else {
   try {
     main(process.argv.slice(2));

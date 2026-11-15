@@ -11,6 +11,8 @@ const progress = require("./lib/progress");
 const { panelHtml } = require("./lib/panel");
 const setup = require("./lib/setup");
 const claude = require("./lib/claude");
+const agents = require("./lib/agents");
+const { AGENTS: hookAgents } = require("./lib/hook");
 
 const REFRESH_MS = 1000;
 const VIEW_ID = "agentProgress.view";
@@ -78,7 +80,7 @@ function readTasks(now) {
         continue;
       }
       const shown = progress.isShown(task, now, showAfterSeconds);
-      countClaude(task, shown);
+      countAgent(task, shown);
       // A command found on its own that was quick: never shown, its file goes at once.
       if (!shown) {
         if (task.state !== "running") {
@@ -130,11 +132,14 @@ function refresh() {
     statusItem.hide();
   }
   if (view && view.visible) {
+    const states = agentStates();
     view.webview.postMessage({
       confirm: pending ? { question: pending.question, ok: pending.ok } : null,
-      claude: claudeState(),
+      agents: states,
+      connectButton: agents.connectButton(states),
+      connectedText: agents.connectedText(states),
       page,
-      connections: page === "connections" ? [claudeConnection(now)] : [],
+      connections: page === "connections" ? connectionRows(now) : [],
       summary: progress.summaryText(tasks, now, staleMinutes),
       tasks: progress
         .panelOrder(tasks, now, staleMinutes)
@@ -340,12 +345,12 @@ async function addInstructions() {
 /**
  * Shows a change to `file` side by side (now / after), and writes it only once the user agrees.
  * The edit goes through the editor, so Ctrl+Z undoes it, and an open file with unsaved changes
- * keeps them. Returns true when written.
+ * keeps them. `after` null deletes the file (one the extension wrote whole). Returns true when written.
  */
 async function previewAndWrite({ file, label, doc, before, after, title, question, ok, revealAt, doneText }) {
   const uri = vscode.Uri.file(file);
   const name = path.basename(file);
-  const proposed = previewUri(name, after);
+  const proposed = previewUri(name, after === null ? "" : after);
   const current = doc ? uri : previewUri(name, "");
   await vscode.commands.executeCommand("vscode.diff", current, proposed, title, { preview: true });
   const answer = await ask(question, ok, proposed);
@@ -358,6 +363,12 @@ async function previewAndWrite({ file, label, doc, before, after, title, questio
   }
 
   const edit = new vscode.WorkspaceEdit();
+  if (after === null) {
+    edit.deleteFile(uri, { ignoreIfNotExists: true });
+    if (!(await vscode.workspace.applyEdit(edit))) throw new Error("VS Code refused to delete it");
+    vscode.window.showInformationMessage(doneText);
+    return true;
+  }
   if (!doc) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     edit.createFile(uri, { ignoreIfExists: true });
@@ -381,28 +392,9 @@ async function previewAndWrite({ file, label, doc, before, after, title, questio
   return true;
 }
 
-/** Claude Code's own settings, where its hooks go. */
-function claudeSettingsFile() {
-  return path.join(os.homedir(), ".claude", "settings.json");
-}
-
-let claudeCache = { mtime: -1, state: "missing" };
-
-/**
- * "connected" (the hooks are in Claude Code's settings), "available" (Claude Code is there, not
- * connected) or "missing". The file is read again only when it changes.
- */
-function claudeState() {
-  const file = claudeSettingsFile();
-  try {
-    const mtime = fs.statSync(file).mtimeMs;
-    if (mtime !== claudeCache.mtime) {
-      claudeCache = { mtime, state: claude.isConnected(fs.readFileSync(file, "utf8")) ? "connected" : "available" };
-    }
-    return claudeCache.state;
-  } catch {
-    return fs.existsSync(path.dirname(file)) ? "available" : "missing";
-  }
+/** Where the tools keep their files: the home folder and the variables that move them. */
+function where() {
+  return { home: os.homedir(), env: process.env };
 }
 
 /** Whether Claude Code has Git Bash to run hooks with (always "yes" outside Windows). */
@@ -410,9 +402,28 @@ function hasBash() {
   return process.platform !== "win32" || claude.hasGitBash(process.env, (file) => fs.existsSync(file));
 }
 
-/** How Claude Code will call the hook on this machine. */
+/** How the tools call the hook on this machine: the launchers' folder, the system, the shell. */
 function hookCall() {
-  return claude.hookCall({ bin: path.join(settings().folder, "bin"), windows: process.platform === "win32", bash: hasBash() });
+  return { bin: path.join(settings().folder, "bin"), windows: process.platform === "win32", bash: hasBash() };
+}
+
+/** Whether a tool is on this computer: its folder, or for Copilot its VS Code extension too. */
+function isInstalled(agent) {
+  if (fs.existsSync(agent.home(where()))) return true;
+  return agent.id === "copilot" && Boolean(vscode.extensions && vscode.extensions.getExtension("GitHub.copilot-chat"));
+}
+
+/**
+ * Each tool on this computer with its state: "connected" (its hooks file holds the panel's
+ * hooks) or "available". Tools that are not there are left out. Files are read again only when
+ * they change.
+ */
+function agentStates() {
+  return agents.AGENTS.filter(isInstalled).map((agent) => ({
+    id: agent.id,
+    name: agent.name,
+    state: cached(agent.file(where()), (text) => agents.isConnected(text)) ? "connected" : "available",
+  }));
 }
 
 /** The page the panel shows: the tasks, or the Connections (the account button above the panel). */
@@ -445,25 +456,26 @@ function cached(file, read) {
   }
 }
 
-/** The Connections page's row for Claude Code. */
-function claudeConnection(now) {
-  const state = claudeState();
-  const settingsText = cached(claudeSettingsFile(), (text) => text);
-  // The account Claude Code is signed in with: its name and its address, masked.
-  const who = cached(path.join(os.homedir(), ".claude.json"), (text) => claude.account(text));
-  const today = stats && stats.day === dayOf(now) ? stats : null;
-  return claude.connectionView({
-    state,
-    account: who,
-    stats: today ? { seen: today.seen.length, shown: today.shown.length, last: today.last } : { seen: 0, shown: 0, last: null },
-    shell: claude.shellName(settingsText, { windows: process.platform === "win32", bash: hasBash() }),
-    now,
-    formatDuration: progress.formatDuration,
+/** The Connections page: one row per tool on this computer, Claude Code first. */
+function connectionRows(now) {
+  const day = dayOf(now);
+  return agentStates().map(({ id, state }) => {
+    const agent = agents.byId(id);
+    const today = stats && stats.day === day && stats.tools[id] ? stats.tools[id] : null;
+    return agents.rowOf(agent, {
+      state,
+      // The account Claude Code is signed in with: its name and its address, masked.
+      account: id === "claude" ? cached(path.join(os.homedir(), ".claude.json"), (text) => claude.account(text)) : null,
+      stats: today ? { seen: today.seen.length, shown: today.shown.length, last: today.last } : { seen: 0, shown: 0, last: null },
+      shell: id === "claude" ? claude.shellName(cached(agent.file(where()), (text) => text), { windows: process.platform === "win32", bash: hasBash() }) : "",
+      now,
+      formatDuration: progress.formatDuration,
+    });
   });
 }
 
-/** Today's Claude Code commands, for the Connections page: { day, seen: [ids], shown: [ids], last }. */
-const STATS_KEY = "agentProgress.claudeToday";
+/** Today's commands of each tool, for the Connections page: { day, tools: { id: { seen: [ids], shown: [ids], last } } }. */
+const STATS_KEY = "agentProgress.agentsToday";
 let stats = null;
 
 function dayOf(ms) {
@@ -471,59 +483,75 @@ function dayOf(ms) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
-/** Counts a command of Claude Code (a "claude-" card) the first time it is seen, and once shown. */
-function countClaude(task, shown) {
-  if (!task.id.startsWith("claude-") || task.started === null) return;
+/** Counts a command of a tool (a "claude-", "codex-"... card) the first time it is seen, and once shown. */
+function countAgent(task, shown) {
+  const agent = Object.entries(hookAgents).find(([, a]) => task.id.startsWith(a.prefix));
+  if (!agent || task.started === null) return;
   const day = dayOf(task.started);
   if (day !== dayOf(Date.now())) return;
-  if (!stats || stats.day !== day) stats = { day, seen: [], shown: [], last: null };
+  if (!stats || stats.day !== day) stats = { day, tools: {} };
+  const today = (stats.tools[agent[0]] ||= { seen: [], shown: [], last: null });
   let changed = false;
-  if (!stats.seen.includes(task.id)) {
-    stats.seen.push(task.id);
+  if (!today.seen.includes(task.id)) {
+    today.seen.push(task.id);
     changed = true;
   }
-  if (shown && !stats.shown.includes(task.id)) {
-    stats.shown.push(task.id);
+  if (shown && !today.shown.includes(task.id)) {
+    today.shown.push(task.id);
     changed = true;
   }
-  if (!stats.last || task.started > stats.last.at) {
-    stats.last = { title: task.title, at: task.started };
+  if (!today.last || task.started > today.last.at) {
+    today.last = { title: task.title, at: task.started };
     changed = true;
   }
   if (changed && memory) memory.update(STATS_KEY, stats);
 }
 
 /**
- * Connects Claude Code: adds hooks to its settings so every command it runs is seen, and the ones
+ * Connects a tool: adds hooks to its settings so every command it runs is seen, and the ones
  * that last show in the panel on their own. Shown side by side first; nothing is written before Connect.
  */
-async function connectClaude() {
-  await changeClaude(
-    (text) => claude.connect(text, hookCall()),
-    {
-      title: "Claude Code settings: now / connected",
-      question: "Connect Claude Code? Its commands that last will show here on their own.",
-      ok: "Connect",
-      doneText: "Claude Code connected: the commands it runs from now on show here once they last.",
-      same: "Claude Code is already connected.",
-    },
-  );
-}
-
-/** Takes the hooks out of Claude Code's settings, shown side by side first. */
-async function disconnectClaude() {
-  await changeClaude((text) => claude.disconnect(text), {
-    title: "Claude Code settings: now / disconnected",
-    question: "Disconnect Claude Code?",
-    ok: "Disconnect",
-    doneText: "Claude Code disconnected.",
-    same: "Claude Code is not connected.",
+async function connectAgent(id) {
+  const agent = agents.byId(id);
+  if (!agent) return;
+  const doneText = `${agent.name} connected: the commands it runs from now on show here once they last.${agent.trust ? ` ${agent.trust}.` : ""}`;
+  await changeAgent(agent, (text) => agent.connect(text, hookCall()), {
+    title: `${agent.label}: now / connected`,
+    question: `Connect ${agent.name}? Its commands that last will show here on their own.`,
+    ok: "Connect",
+    doneText,
+    same: `${agent.name} is already connected.`,
   });
 }
 
-async function changeClaude(change, { title, question, ok, doneText, same }) {
-  const file = claudeSettingsFile();
-  const label = "~/.claude/settings.json";
+/** Takes the hooks out of a tool's settings (or deletes the file the panel wrote whole), shown side by side first. */
+async function disconnectAgent(id) {
+  const agent = agents.byId(id);
+  if (!agent) return;
+  await changeAgent(agent, (text) => (agents.isConnected(text) ? agent.disconnect(text) : text), {
+    title: `${agent.label}: now / disconnected`,
+    question: `Disconnect ${agent.name}?`,
+    ok: "Disconnect",
+    doneText: `${agent.name} disconnected.`,
+    same: `${agent.name} is not connected.`,
+  });
+}
+
+/** Picks a tool on this computer to connect or disconnect (Command Palette). */
+async function pickAgent(wanted, action) {
+  const choices = agentStates()
+    .filter((s) => s.state === wanted)
+    .map((s) => ({ label: s.name, id: s.id }));
+  if (!choices.length) {
+    vscode.window.showInformationMessage(wanted === "available" ? "Every agent found on this computer is connected." : "No agent is connected.");
+    return;
+  }
+  const pick = choices.length === 1 ? choices[0] : await vscode.window.showQuickPick(choices, { title: wanted === "available" ? "Connect an agent" : "Disconnect an agent" });
+  if (pick) await action(pick.id);
+}
+
+async function changeAgent(agent, change, { title, question, ok, doneText, same }) {
+  const file = agent.file(where());
   try {
     const exists = fs.existsSync(file);
     const doc = exists ? await vscode.workspace.openTextDocument(vscode.Uri.file(file)) : null;
@@ -532,15 +560,15 @@ async function changeClaude(change, { title, question, ok, doneText, same }) {
     try {
       after = change(before);
     } catch {
-      vscode.window.showWarningMessage(`${label} is not plain JSON: nothing was changed. "How it works" shows the hooks to add by hand.`);
+      vscode.window.showWarningMessage(`${agent.label} is not plain JSON: nothing was changed. The README shows the hooks to add by hand.`);
       return;
     }
-    if (after === before || (ok === "Disconnect" && !claude.isConnected(before))) {
+    if (after === before || (after === null && !exists)) {
       vscode.window.showInformationMessage(same);
       return;
     }
-    await previewAndWrite({ file, label, doc, before, after, title, question, ok, revealAt: '"hooks"', doneText });
-    claudeCache.mtime = -1;
+    await previewAndWrite({ file, label: agent.label, doc, before, after, title, question, ok, revealAt: '"hooks"', doneText });
+    fileCache.delete(file);
     refresh();
   } catch (error) {
     vscode.window.showWarningMessage(`Could not change ${file}: ${error.message}`);
@@ -595,13 +623,16 @@ function onViewMessage(message) {
   if (!message || typeof message !== "object") return;
   if (message.cmd === "ready") return refresh();
   if (message.cmd === "setup") return addInstructions();
-  if (message.cmd === "claude") return connectClaude();
-  if (message.cmd === "disconnect") return disconnectClaude();
+  const agentId = typeof message.agent === "string" ? message.agent : "";
+  if (message.cmd === "connect") return connectAgent(agentId);
+  if (message.cmd === "disconnect") return disconnectAgent(agentId);
+  if (message.cmd === "agent-settings") {
+    const agent = agents.byId(agentId);
+    if (agent) vscode.window.showTextDocument(vscode.Uri.file(agent.file(where()))).then(undefined, () => undefined);
+    return;
+  }
   if (message.cmd === "connections") return showPage("connections");
   if (message.cmd === "tasks") return showPage("tasks");
-  if (message.cmd === "claude-settings") {
-    return vscode.window.showTextDocument(vscode.Uri.file(claudeSettingsFile())).then(undefined, () => undefined);
-  }
   if (message.cmd === "guide") return howItWorks();
   if (message.cmd === "confirm") return pending?.settle("ok");
   if (message.cmd === "cancel") return pending?.settle("cancel");
@@ -659,8 +690,10 @@ function activate(context) {
     vscode.commands.registerCommand("agentProgress.clearFinished", clearFinished),
     vscode.commands.registerCommand("agentProgress.openFolder", openFolder),
     vscode.commands.registerCommand("agentProgress.addInstructions", addInstructions),
-    vscode.commands.registerCommand("agentProgress.connectClaude", connectClaude),
-    vscode.commands.registerCommand("agentProgress.disconnectClaude", disconnectClaude),
+    vscode.commands.registerCommand("agentProgress.connectClaude", () => connectAgent("claude")),
+    vscode.commands.registerCommand("agentProgress.disconnectClaude", () => disconnectAgent("claude")),
+    vscode.commands.registerCommand("agentProgress.connectAgent", () => pickAgent("available", connectAgent)),
+    vscode.commands.registerCommand("agentProgress.disconnectAgent", () => pickAgent("connected", disconnectAgent)),
     vscode.commands.registerCommand("agentProgress.connections", toggleConnections),
     vscode.workspace.registerTextDocumentContentProvider(PREVIEW_SCHEME, {
       provideTextDocumentContent: (uri) => previews.get(uri.path) ?? "",
@@ -691,6 +724,7 @@ function activate(context) {
   // above it shows the move that makes sense.
   memory = context.globalState;
   stats = memory.get(STATS_KEY, null);
+  if (stats && !stats.tools) stats = null;
   vscode.commands.executeCommand("setContext", BESIDE_KEY, memory.get(BESIDE_KEY, false));
   // The agent-progress command: launchers in a fixed place, and in every terminal VS Code opens.
   const launchers = installLaunchers(context);

@@ -1,8 +1,8 @@
 {
   "name": "agent-progress-bar",
   "displayName": "Agent Progress Bar",
-  "description": "A progress bar and the time left for the long tasks your AI agents run in the background, in the status bar and in a panel next to the terminal. Works with any agent, command or script.",
-  "version": "0.2.0",
+  "description": "A progress bar and the time left for the long tasks your AI agents run in the background, in the status bar and in a panel next to the terminal. Connects to Claude Code, Codex, GitHub Copilot and Gemini CLI; works with any agent, command or script.",
+  "version": "0.3.0",
   "publisher": "ludwigdinspel",
   "author": "Ludwig Junior Dinspel",
   "license": "MIT",
@@ -73,6 +73,17 @@
       {
         "command": "agentProgress.disconnectClaude",
         "title": "Disconnect Claude Code",
+        "category": "Agent Progress"
+      },
+      {
+        "command": "agentProgress.connectAgent",
+        "title": "Connect an Agent",
+        "category": "Agent Progress",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "agentProgress.disconnectAgent",
+        "title": "Disconnect an Agent",
         "category": "Agent Progress"
       },
       {
@@ -229,7 +240,7 @@
           "type": "number",
           "default": 20,
           "minimum": 0,
-          "description": "With Claude Code connected, a command it runs shows in the list once it has lasted this many seconds. Quicker ones never show."
+          "description": "With an agent connected (Claude Code, Codex, GitHub Copilot, Gemini CLI), a command it runs shows in the list once it has lasted this many seconds. Quicker ones never show."
         },
         "agentProgress.notify": {
           "type": "boolean",
