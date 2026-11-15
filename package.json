@@ -1,0 +1,88 @@
+{
+  "name": "task-progress-bar",
+  "displayName": "Task Progress Bar",
+  "description": "See how far a long background task has got, and how long is left, right in the status bar. Any AI agent or script can report its progress by writing a small JSON file.",
+  "version": "0.1.0",
+  "publisher": "ludwigdinspel",
+  "author": "Ludwig Junior Dinspel",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LeDeutsch/task-progress-bar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LeDeutsch/task-progress-bar/issues"
+  },
+  "homepage": "https://github.com/LeDeutsch/task-progress-bar#readme",
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "progress",
+    "progress bar",
+    "time remaining",
+    "eta",
+    "background task",
+    "agent",
+    "ai"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "taskProgress.showPanel",
+        "title": "Show Panel",
+        "category": "Task Progress"
+      },
+      {
+        "command": "taskProgress.clearFinished",
+        "title": "Clear Finished Tasks",
+        "category": "Task Progress"
+      },
+      {
+        "command": "taskProgress.openFolder",
+        "title": "Open Progress Folder",
+        "category": "Task Progress"
+      }
+    ],
+    "configuration": {
+      "title": "Task Progress Bar",
+      "properties": {
+        "taskProgress.folder": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Folder watched for progress files. Empty: `~/.task-progress`."
+        },
+        "taskProgress.staleMinutes": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "description": "A running task with no update for this many minutes is shown as stalled."
+        },
+        "taskProgress.keepFinishedMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "description": "How many minutes a finished or failed task stays visible."
+        },
+        "taskProgress.notify": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a notification when a task finishes or fails."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test",
+    "package": "npx --yes @vscode/vsce@3.2.1 package"
+  }
+}
