@@ -2,13 +2,18 @@
 
 When an AI agent starts something long in the background (a build, a big batch of files, model work...), you usually get no sign of life until it is over. This extension gives you one: a progress bar and the time left, in the VS Code status bar, with a panel of progress cards next to the terminal when you click it.
 
-It works with any agent, and with any script too: the task writes a small JSON file, the extension reads it once a second. That's the whole contract.
+It works with any agent, and with any command or script too: put `agent-progress run` in front of a command, or have a script write a small JSON file. The extension reads the progress folder once a second.
+
+![The Agent Progress panel next to the terminal: several tasks running, one stalled, one failed, two done](media/screenshot.png)
 
 ## Install
 
-- From a `.vsix` file: in VS Code, **Extensions** view, `...` menu, **Install from VSIX...**.
-- From the source folder: Command Palette, **Developer: Install Extension from Location...**, then pick the folder.
-- To build the `.vsix` yourself: `npm run package` (uses the official `@vscode/vsce` tool).
+1. Download the `.vsix` file from the [latest release](https://github.com/LeDeutsch/agent-progress-bar/releases/latest).
+2. In VS Code (or Cursor, Windsurf, VSCodium): **Extensions** view, `...` menu at the top, **Install from VSIX...**, then pick the file.
+
+It is not on the VS Code Marketplace yet. To update, install the newer `.vsix` the same way.
+
+From the source: Command Palette, **Developer: Install Extension from Location...**, then pick the folder. `npm run package` builds the `.vsix` (with the official `@vscode/vsce` tool).
 
 ## Getting started
 
@@ -29,7 +34,7 @@ Open the **Agent Progress** panel (next to the terminal, or click the status bar
 
 ## Try it
 
-`npm run demo` writes a few fake tasks for 90 seconds: a count with the time left and a log, several tasks at once, a task with no known progress, a failure, a stalled task. Watch the status bar and click it.
+From the source folder, `npm run demo` writes a few fake tasks for 90 seconds: a count with the time left and a log, several tasks at once, a task with no known progress, a failure, a stalled task. Watch the status bar and click it.
 
 ## The `agent-progress` command
 

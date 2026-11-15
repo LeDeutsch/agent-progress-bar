@@ -1,7 +1,7 @@
 {
   "name": "agent-progress-bar",
   "displayName": "Agent Progress Bar",
-  "description": "A progress bar and the time left, in the status bar, for the long tasks your AI agents run in the background. Any agent or script reports its progress by writing a small JSON file.",
+  "description": "A progress bar and the time left for the long tasks your AI agents run in the background, in the status bar and in a panel next to the terminal. Works with any agent, command or script.",
   "version": "0.1.0",
   "publisher": "ludwigdinspel",
   "author": "Ludwig Junior Dinspel",
