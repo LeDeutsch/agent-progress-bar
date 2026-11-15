@@ -36,24 +36,112 @@
     "onStartupFinished"
   ],
   "main": "./extension.js",
+  "bin": {
+    "agent-progress": "bin/agent-progress.js"
+  },
   "contributes": {
     "commands": [
       {
         "command": "agentProgress.showPanel",
-        "title": "Show Panel",
+        "title": "Show Progress Panel",
         "category": "Agent Progress"
       },
       {
         "command": "agentProgress.clearFinished",
         "title": "Clear Finished Tasks",
-        "category": "Agent Progress"
+        "category": "Agent Progress",
+        "icon": "$(clear-all)"
       },
       {
         "command": "agentProgress.openFolder",
         "title": "Open Progress Folder",
-        "category": "Agent Progress"
+        "category": "Agent Progress",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "agentProgress.addInstructions",
+        "title": "Add Agent Instructions",
+        "category": "Agent Progress",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "agentProgress.howItWorks",
+        "title": "How It Works",
+        "category": "Agent Progress",
+        "icon": "$(question)"
+      },
+      {
+        "command": "agentProgress.confirmAdd",
+        "title": "Write the Agent Instructions",
+        "category": "Agent Progress",
+        "icon": "$(check)"
+      },
+      {
+        "command": "agentProgress.cancelAdd",
+        "title": "Cancel the Agent Instructions",
+        "category": "Agent Progress",
+        "icon": "$(close)"
       }
     ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "agentProgress",
+          "title": "Agent Progress",
+          "icon": "media/progress.svg"
+        }
+      ]
+    },
+    "views": {
+      "agentProgress": [
+        {
+          "type": "webview",
+          "id": "agentProgress.view",
+          "name": "Agent Progress"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "agentProgress.clearFinished",
+          "when": "view == agentProgress.view",
+          "group": "navigation"
+        },
+        {
+          "command": "agentProgress.openFolder",
+          "when": "view == agentProgress.view",
+          "group": "navigation"
+        },
+        {
+          "command": "agentProgress.howItWorks",
+          "when": "view == agentProgress.view",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "agentProgress.confirmAdd",
+          "when": "agentProgress.pending && resourceScheme == agent-progress-preview",
+          "group": "navigation@1"
+        },
+        {
+          "command": "agentProgress.cancelAdd",
+          "when": "agentProgress.pending && resourceScheme == agent-progress-preview",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "agentProgress.confirmAdd",
+          "when": "agentProgress.pending"
+        },
+        {
+          "command": "agentProgress.cancelAdd",
+          "when": "agentProgress.pending"
+        }
+      ]
+    },
     "configuration": {
       "title": "Agent Progress Bar",
       "properties": {
@@ -83,7 +171,7 @@
     }
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test \"test/*.test.js\"",
     "demo": "node examples/demo.js",
     "package": "npx --yes @vscode/vsce@3.2.1 package"
   }

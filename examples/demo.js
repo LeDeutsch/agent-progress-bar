@@ -20,10 +20,15 @@ function write(id, data) {
   fs.renameSync(`${file}.tmp`, file);
 }
 
+// The build also writes a log, so its card gets an "Open log" button.
+const buildLog = path.join(folder, "demo-build.log");
+fs.writeFileSync(buildLog, "Demo build log\n");
+let logged = 0;
+
 function cleanUp() {
-  for (const id of ids) {
+  for (const file of [...ids.map((id) => `${id}.json`), "demo-build.log"]) {
     try {
-      fs.unlinkSync(path.join(folder, `${id}.json`));
+      fs.unlinkSync(path.join(folder, file));
     } catch {
       // already gone
     }
@@ -44,6 +49,7 @@ function tick() {
 
   // 120 files in 60 s, with a count and the time left from the pace.
   const files = Math.min(120, Math.floor(t * 2));
+  for (; logged < files; logged += 1) fs.appendFileSync(buildLog, `compiled file ${logged + 1} of 120\n`);
   write("demo-build", {
     title: "Demo: build",
     done: files,
@@ -52,6 +58,7 @@ function tick() {
     detail: files < 120 ? `compiling file ${files + 1}` : "all files compiled",
     started: iso(start),
     state: files < 120 ? "running" : "done",
+    log: "demo-build.log",
   });
 
   // Percent only, with the writer's own estimate of the time left.

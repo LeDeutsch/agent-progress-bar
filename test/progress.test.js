@@ -33,13 +33,50 @@ test("an eta given by the writer wins and counts down since the last update", ()
   assert.equal(Math.round(p.remainingSeconds(task, NOW)), 480);
 });
 
+test("the time left follows the speed of the last few minutes", () => {
+  // 50 % in 60 minutes, but only 4 % in the last 2 minutes: it slowed down to 2 % a minute.
+  const at = (m, percent) => p.parseTask("a", JSON.stringify({ percent, started: minutesAgo(60), updated: minutesAgo(m) }), NOW);
+  let samples = [];
+  for (const [m, percent] of [[2, 46], [1, 48], [0, 50]]) samples = p.addSample(samples, at(m, percent), NOW);
+  const task = at(0, 50);
+  assert.equal(Math.round(p.remainingSeconds(task, NOW) / 60), 60, "without readings: the pace since the start");
+  task.samples = samples;
+  const { seconds, source } = p.estimate(task, NOW);
+  assert.equal(Math.round(seconds / 60), 25, "with readings: 50 % left at 2 % a minute");
+  assert.equal(source, "recent");
+  assert.equal(p.view(task, NOW, 10).leftHint, "From the speed over the last 3 minutes");
+});
+
+test("readings: one per update, old ones dropped, a restart starts over", () => {
+  const at = (m, percent) => p.parseTask("a", JSON.stringify({ percent, updated: minutesAgo(m) }), NOW);
+  let samples = p.addSample([], at(9, 10), NOW);
+  samples = p.addSample(samples, at(2, 20), NOW);
+  samples = p.addSample(samples, at(2, 20), NOW);
+  assert.deepEqual(samples.map((s) => s.percent), [20], "the 9 minute old reading is dropped, the same update counted once");
+  samples = p.addSample(samples, at(1, 5), NOW);
+  assert.deepEqual(samples.map((s) => s.percent), [5], "progress went back: the task restarted");
+});
+
+test("the panel knows which tasks have a log and which can be removed", () => {
+  const running = p.parseTask("a", JSON.stringify({ percent: 5, log: " C:/logs/build.txt " }), NOW);
+  assert.equal(running.log, "C:/logs/build.txt");
+  assert.equal(p.view(running, NOW, 10).hasLog, true);
+  assert.equal(p.view(running, NOW, 10).removable, false);
+  const done = p.parseTask("b", '{"state": "done"}', NOW);
+  assert.equal(p.view(done, NOW, 10).hasLog, false);
+  assert.equal(p.view(done, NOW, 10).removable, true);
+});
+
 test("without a start time or progress, the time left is unknown", () => {
   assert.equal(p.remainingSeconds(p.parseTask("a", '{"done": 3, "total": 10}', NOW), NOW), null);
   assert.equal(p.remainingSeconds(p.parseTask("a", '{"state": "done"}', NOW), NOW), 0);
 });
 
 test("durations read naturally", () => {
-  assert.equal(p.formatDuration(30), "under a minute");
+  assert.equal(p.formatDuration(0.2), "1 s");
+  assert.equal(p.formatDuration(8), "8 s");
+  assert.equal(p.formatDuration(42), "40 s");
+  assert.equal(p.formatDuration(58), "1 min");
   assert.equal(p.formatDuration(12 * 60), "12 min");
   assert.equal(p.formatDuration(65 * 60), "1 h 05 min");
   assert.equal(p.formatDuration(null), "");
