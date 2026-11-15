@@ -25,7 +25,7 @@ Open the **Agent Progress** panel (next to the terminal, or click the status bar
 ## What you see
 
 - In the status bar: `Voice packs 42% · 35 min left`, and `(+1)` when other tasks run too.
-- Click it: the **Agent Progress** panel opens next to the terminal (you can drag it to a side bar). One card per task, with the count (`2,440 / 5,808 takes`), the time left, a detail line and how long it has run. Several agents at once each get their own card: running tasks first, then stalled, failed and done.
+- Click it: the **Agent Progress** panel opens next to the terminal (you can drag it to a side bar). The split button at its top puts it **beside the terminal**, both side by side in the bottom panel; clicking it again puts it back in its own tab. One card per task, with the count (`2,440 / 5,808 takes`), the time left, a detail line and how long it has run. Several agents at once each get their own card: running tasks first, then stalled, failed and done.
 - **Open log** on a card opens the log the task writes, scrolled to the latest lines: what the agent is doing right now. **Remove** takes a finished, failed or stalled task off the list.
 - The time left follows the speed of the last 3 minutes, so it adjusts when a task speeds up or slows down. Hover it to see where the estimate comes from.
 - A task with no news for 10 minutes is shown as stalled (yellow).

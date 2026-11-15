@@ -350,6 +350,37 @@ function openSettings() {
   vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${extensionId}`);
 }
 
+/** VS Code's own view containers: the terminal's, and the panel tab this extension adds. */
+const TERMINAL_CONTAINER = "terminal";
+const OWN_CONTAINER = "workbench.view.extension.agentProgress";
+const BESIDE_KEY = "agentProgress.besideTerminal";
+let memory;
+
+/**
+ * Puts the panel beside the terminal (both side by side in the bottom panel), or back in its own
+ * tab. Uses VS Code's "vscode.moveViews" command (not in the public API: it could change); if it
+ * fails, VS Code's "Move View" chooser lets the user pick the place instead.
+ */
+async function toggleBesideTerminal() {
+  const beside = memory.get(BESIDE_KEY, false);
+  try {
+    await vscode.commands.executeCommand("vscode.moveViews", {
+      viewIds: [VIEW_ID],
+      destinationId: beside ? OWN_CONTAINER : TERMINAL_CONTAINER,
+    });
+    await setBeside(!beside);
+    if (!beside) vscode.commands.executeCommand("workbench.action.terminal.focus");
+  } catch {
+    await vscode.commands.executeCommand(`${VIEW_ID}.focus`);
+    await vscode.commands.executeCommand("workbench.action.moveFocusedView");
+  }
+}
+
+async function setBeside(beside) {
+  await memory.update(BESIDE_KEY, beside);
+  await vscode.commands.executeCommand("setContext", BESIDE_KEY, beside);
+}
+
 function howItWorks() {
   const guide = vscode.Uri.joinPath(extensionUri, "media", "how-it-works.md");
   vscode.commands.executeCommand("markdown.showPreview", guide).then(undefined, () => vscode.window.showTextDocument(guide));
@@ -421,6 +452,8 @@ function activate(context) {
     }),
     vscode.commands.registerCommand("agentProgress.howItWorks", howItWorks),
     vscode.commands.registerCommand("agentProgress.openSettings", openSettings),
+    vscode.commands.registerCommand("agentProgress.besideTerminal", toggleBesideTerminal),
+    vscode.commands.registerCommand("agentProgress.ownTab", toggleBesideTerminal),
     vscode.commands.registerCommand("agentProgress.confirmAdd", () => pending?.settle("ok")),
     vscode.commands.registerCommand("agentProgress.cancelAdd", () => pending?.settle("cancel")),
     // Closing the preview answers Cancel.
@@ -439,6 +472,10 @@ function activate(context) {
   );
   extensionUri = context.extensionUri;
   extensionId = context.extension.id;
+  // Where the panel was left last time (beside the terminal or in its own tab): the button
+  // above it shows the move that makes sense.
+  memory = context.globalState;
+  vscode.commands.executeCommand("setContext", BESIDE_KEY, memory.get(BESIDE_KEY, false));
   // The agent-progress command: launchers in a fixed place, and in every terminal VS Code opens.
   const launchers = installLaunchers(context);
   const terminals = context.environmentVariableCollection;

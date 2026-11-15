@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- A button at the top of the panel puts it beside the terminal (side by side in the bottom panel); clicking it again puts it back in its own tab. If VS Code ever changes the way this works, the button opens VS Code's own "Move View" chooser instead.
+
 ## 0.1.2
 
 - A gear at the top of the panel opens the extension's settings; the README and the guide say where they are.

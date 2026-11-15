@@ -2,7 +2,7 @@
   "name": "agent-progress-bar",
   "displayName": "Agent Progress Bar",
   "description": "A progress bar and the time left for the long tasks your AI agents run in the background, in the status bar and in a panel next to the terminal. Works with any agent, command or script.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "ludwigdinspel",
   "author": "Ludwig Junior Dinspel",
   "license": "MIT",
@@ -87,6 +87,18 @@
         "title": "Open Settings",
         "category": "Agent Progress",
         "icon": "$(gear)"
+      },
+      {
+        "command": "agentProgress.besideTerminal",
+        "title": "Show Beside the Terminal",
+        "category": "Agent Progress",
+        "icon": "$(split-horizontal)"
+      },
+      {
+        "command": "agentProgress.ownTab",
+        "title": "Show in Its Own Tab",
+        "category": "Agent Progress",
+        "icon": "$(layout-panel)"
       }
     ],
     "viewsContainers": {
@@ -125,6 +137,16 @@
           "group": "navigation"
         },
         {
+          "command": "agentProgress.besideTerminal",
+          "when": "view == agentProgress.view && !agentProgress.besideTerminal",
+          "group": "navigation"
+        },
+        {
+          "command": "agentProgress.ownTab",
+          "when": "view == agentProgress.view && agentProgress.besideTerminal",
+          "group": "navigation"
+        },
+        {
           "command": "agentProgress.openSettings",
           "when": "view == agentProgress.view",
           "group": "navigation"
@@ -150,6 +172,14 @@
         {
           "command": "agentProgress.cancelAdd",
           "when": "agentProgress.pending"
+        },
+        {
+          "command": "agentProgress.besideTerminal",
+          "when": "!agentProgress.besideTerminal"
+        },
+        {
+          "command": "agentProgress.ownTab",
+          "when": "agentProgress.besideTerminal"
         }
       ]
     },
