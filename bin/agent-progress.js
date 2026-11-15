@@ -8,6 +8,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const cli = require("../lib/cli");
+const { formatDuration } = require("../lib/progress");
 
 const HELP = `agent-progress: show a task in the Agent Progress Bar extension.
 
@@ -99,7 +100,8 @@ function run(options, args) {
   const logStream = fs.createWriteStream(log);
   logStream.write(`$ ${line}\n`);
 
-  const data = { title: options.title || line, started: now(), state: "running", log, detail: "" };
+  const startedAt = Date.now();
+  const data = { title: options.title || line, started: new Date(startedAt).toISOString(), state: "running", log, detail: "" };
   if (options.unit) data.unit = options.unit;
   const save = () => {
     data.updated = now();
@@ -168,7 +170,9 @@ function run(options, args) {
   child.on("error", (error) => end(127, `could not start: ${error.message}`));
   child.on("close", (code, signal) => {
     const tail = cli.cleanLine(pending) || lastLine;
-    if (code === 0) end(0, tail.slice(0, 160) || "finished");
+    // The last line of a successful command often says little ("0 passed" of cargo's doc tests):
+    // the time it took says more, and Open log has the rest.
+    if (code === 0) end(0, `finished in ${formatDuration((Date.now() - startedAt) / 1000)}`);
     else {
       const how = code === null ? `stopped (${signal})` : `exit code ${code}`;
       end(code === null ? 1 : code, tail ? `${how}: ${tail}`.slice(0, 160) : how);

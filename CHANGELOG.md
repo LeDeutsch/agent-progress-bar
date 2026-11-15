@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- A finished task stays 2 minutes in the list (was 5), and a line at the bottom of its card empties until it leaves; cards fade out instead of vanishing.
+- A command run through `agent-progress run` that succeeds says how long it took ("finished in 1 min") instead of its last line, which often said little; **Open log** has the rest.
+- Progress files with no update for a day are deleted by themselves, with the logs `agent-progress` wrote next to them (setting `agentProgress.deleteFilesAfterHours`, `0` to keep them).
+
 ## 0.1.0
 
 - **Add agent instructions** also offers Cursor (`.cursor/rules/agent-progress.mdc`, applied in every chat), GitHub Copilot (`.github/copilot-instructions.md`) and Gemini CLI (`GEMINI.md`).

@@ -35,13 +35,28 @@ function settings() {
     customFolder: path.resolve(folder) === path.resolve(standard) ? null : path.resolve(folder),
     staleMinutes: config.get("staleMinutes", 10),
     notify: config.get("notify", true),
-    keepFinishedMinutes: config.get("keepFinishedMinutes", 5),
+    keepFinishedMinutes: config.get("keepFinishedMinutes", progress.KEEP_FINISHED_MINUTES),
+    deleteAfterHours: config.get("deleteFilesAfterHours", 24),
   };
 }
 
-/** Every task in the folder, finished ones kept for a few minutes. */
+/** Deletes an old task's progress file, and its log when the log is in the progress folder. */
+function deleteOld(task, folder) {
+  try {
+    fs.unlinkSync(path.join(folder, `${task.id}.json`));
+    if (task.log && progress.isInside(folder, logPath(task.log))) fs.rmSync(logPath(task.log), { force: true });
+  } catch {
+    // Locked or already gone: next time.
+  }
+  forget(task.id);
+}
+
+/**
+ * Every task in the folder, finished ones kept for a few minutes. Files with no update for a day
+ * (the setting) are deleted on the way, so the folder does not fill up.
+ */
 function readTasks(now) {
-  const { folder, keepFinishedMinutes } = settings();
+  const { folder, keepFinishedMinutes, deleteAfterHours } = settings();
   let names = [];
   try {
     names = fs.readdirSync(folder).filter((name) => name.endsWith(".json"));
@@ -56,6 +71,10 @@ function readTasks(now) {
       const stat = fs.statSync(file);
       const task = progress.parseTask(id, fs.readFileSync(file, "utf8"), stat.mtimeMs) ?? lastGood.get(id);
       if (!task) continue;
+      if (progress.isOld(task, now, deleteAfterHours)) {
+        deleteOld(task, folder);
+        continue;
+      }
       lastGood.set(id, task);
       task.samples = progress.addSample(history.get(id) || [], task, now);
       history.set(id, task.samples);
@@ -81,7 +100,7 @@ function notifyEnds(tasks) {
 
 function refresh() {
   const now = Date.now();
-  const { staleMinutes } = settings();
+  const { staleMinutes, keepFinishedMinutes } = settings();
   const tasks = readTasks(now);
   notifyEnds(tasks);
   const text = progress.statusText(tasks, now, staleMinutes);
@@ -101,7 +120,9 @@ function refresh() {
     view.webview.postMessage({
       confirm: pending ? { question: pending.question, ok: pending.ok } : null,
       summary: progress.summaryText(tasks, now, staleMinutes),
-      tasks: progress.panelOrder(tasks, now, staleMinutes).map((task) => progress.view(task, now, staleMinutes)),
+      tasks: progress
+        .panelOrder(tasks, now, staleMinutes)
+        .map((task) => progress.view(task, now, staleMinutes, keepFinishedMinutes)),
     });
   }
 }

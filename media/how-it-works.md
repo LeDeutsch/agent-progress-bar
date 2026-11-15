@@ -46,7 +46,9 @@ Click **Add agent instructions** in the empty panel, or run **Agent Progress: Ad
 | Blue | Running. The dot pulses. |
 | Yellow | No news for 10 minutes: maybe stuck. |
 | Red | Failed. |
-| Green | Done. Finished tasks leave the panel after 5 minutes. |
+| Green | Done. |
+
+A finished card (green or red) leaves the list after 2 minutes: the line at its bottom empties until then.
 
 Hover the time left to see how it is estimated. **Remove** takes a finished, failed or stuck task off the list. The status bar shows the oldest running task, and `(+2)` when others run too.
 

@@ -2,7 +2,7 @@
   "name": "agent-progress-bar",
   "displayName": "Agent Progress Bar",
   "description": "A progress bar and the time left for the long tasks your AI agents run in the background, in the status bar and in a panel next to the terminal. Works with any agent, command or script.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "ludwigdinspel",
   "author": "Ludwig Junior Dinspel",
   "license": "MIT",
@@ -158,14 +158,20 @@
         },
         "agentProgress.keepFinishedMinutes": {
           "type": "number",
-          "default": 5,
+          "default": 2,
           "minimum": 0,
-          "description": "How many minutes a finished or failed task stays visible."
+          "description": "How many minutes a finished or failed task stays in the list. A line at the bottom of its card empties meanwhile."
         },
         "agentProgress.notify": {
           "type": "boolean",
           "default": true,
           "description": "Show a notification when a task finishes or fails."
+        },
+        "agentProgress.deleteFilesAfterHours": {
+          "type": "number",
+          "default": 24,
+          "minimum": 0,
+          "description": "Progress files with no update for this many hours are deleted, with the logs the agent-progress command wrote next to them. 0: never."
         }
       }
     }

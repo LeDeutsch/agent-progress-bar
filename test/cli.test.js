@@ -67,7 +67,7 @@ test("run shows the command, keeps its output as the log, and ends done", () => 
   assert.equal(data.state, "done");
   assert.equal(data.title, "Steps");
   assert.deepEqual([data.done, data.total, data.unit], [3, 3, "steps"]);
-  assert.equal(data.detail, "step 3 of 3");
+  assert.match(data.detail, /^finished in \d+ s$/, "a success says how long it took, not its last line");
   const log = fs.readFileSync(data.log, "utf8");
   assert.match(log, /starting/);
   assert.match(log, /warning: something/, "stderr goes to the log too");

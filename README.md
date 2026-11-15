@@ -93,7 +93,7 @@ Write one JSON file per task in `~/.agent-progress/` (on Windows: `C:\Users\<you
 
 Without `done`/`total` or `percent`, the bar just moves to show the task is alive. Write the file in one go (write to a temporary file, then rename) so it is never read half-written; if it is, the extension keeps the previous value.
 
-When the task ends, set `"state": "done"` (or `"failed"`). Finished tasks disappear after 5 minutes, or with **Remove** on their card, or with **Clear Finished Tasks** (the button at the top of the panel), which delete their files.
+When the task ends, set `"state": "done"` (or `"failed"`). A finished task leaves the list after 2 minutes (a line at the bottom of its card empties meanwhile), or right away with **Remove** on its card or **Clear Finished Tasks** (the button at the top of the panel), which delete its file. Progress files with no update for a day are deleted by themselves, with the logs `agent-progress` wrote in the progress folder; logs elsewhere are never touched.
 
 ### Examples
 
@@ -140,7 +140,8 @@ An agent can also write the JSON file itself, as described above.
 |---|---|---|
 | `agentProgress.folder` | `~/.agent-progress` | Folder watched for progress files. |
 | `agentProgress.staleMinutes` | `10` | No update for this long: shown as stalled. |
-| `agentProgress.keepFinishedMinutes` | `5` | How long a finished task stays visible. |
+| `agentProgress.keepFinishedMinutes` | `2` | How long a finished task stays in the list. |
+| `agentProgress.deleteFilesAfterHours` | `24` | Progress files with no update for this long are deleted. `0`: never. |
 | `agentProgress.notify` | `true` | Notification when a task finishes or fails. |
 
 ## Privacy

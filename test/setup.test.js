@@ -89,5 +89,5 @@ test("the launcher runs the command, and VS Code's switch does not reach the wra
   assert.equal(r.status, 0, r.stderr);
   const data = JSON.parse(fs.readFileSync(path.join(dir, "env-check.json"), "utf8"));
   assert.equal(data.state, "done");
-  assert.equal(data.detail, "ELECTRON_RUN_AS_NODE=unset");
+  assert.match(fs.readFileSync(data.log, "utf8"), /^ELECTRON_RUN_AS_NODE=unset$/m);
 });

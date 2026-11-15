@@ -57,6 +57,26 @@ test("readings: one per update, old ones dropped, a restart starts over", () => 
   assert.deepEqual(samples.map((s) => s.percent), [5], "progress went back: the task restarted");
 });
 
+test("a finished task stays 2 minutes by default, a running one has no countdown", () => {
+  const done = p.parseTask("d", JSON.stringify({ state: "done", updated: minutesAgo(0.5) }), NOW);
+  const v = p.view(done, NOW, 10);
+  assert.deepEqual([v.keepFor, v.leavesIn], [120, 90]);
+  const running = p.parseTask("r", JSON.stringify({ percent: 5 }), NOW);
+  assert.equal(p.view(running, NOW, 10).leavesIn, null);
+});
+
+test("old progress files, and only logs inside the progress folder, can go", () => {
+  const old = p.parseTask("o", JSON.stringify({ state: "done", updated: minutesAgo(25 * 60) }), NOW);
+  const recent = p.parseTask("n", JSON.stringify({ state: "done", updated: minutesAgo(60) }), NOW);
+  assert.equal(p.isOld(old, NOW, 24), true);
+  assert.equal(p.isOld(recent, NOW, 24), false);
+  assert.equal(p.isOld(old, NOW, 0), false, "0 hours: never");
+  assert.equal(p.isInside("C:/Users/me/.agent-progress", "C:/Users/me/.agent-progress/build.log"), true);
+  assert.equal(p.isInside("C:/Users/me/.agent-progress", "C:/work/build.log"), false, "a log of the user's stays");
+  assert.equal(p.isInside("C:/Users/me/.agent-progress", "C:/Users/me/.agent-progress/../x.log"), false);
+  assert.equal(p.isInside("C:/Users/me/.agent-progress", "C:/Users/me/.agent-progress"), false);
+});
+
 test("the panel knows which tasks have a log and which can be removed", () => {
   const running = p.parseTask("a", JSON.stringify({ percent: 5, log: " C:/logs/build.txt " }), NOW);
   assert.equal(running.log, "C:/logs/build.txt");
@@ -140,9 +160,10 @@ test("the panel says how long a task has run, or when it ended", () => {
   const running = p.parseTask("a", JSON.stringify({ percent: 50, started: minutesAgo(12) }), NOW);
   assert.equal(p.view(running, NOW, 10).when, "running for 12 min");
   const done = p.parseTask("b", JSON.stringify({ state: "done", started: minutesAgo(30), updated: minutesAgo(3) }), NOW);
-  const v = p.view(done, NOW, 10);
+  const v = p.view(done, NOW, 10, 5);
   assert.equal(v.when, "3 min ago");
-  assert.equal(v.whenHint, "Took 27 min");
+  assert.equal(v.whenHint, "Took 27 min. Leaves the list in 2 min");
+  assert.deepEqual([v.leavesIn, v.keepFor], [120, 300], "2 of its 5 minutes left");
   const stalled = p.parseTask("c", JSON.stringify({ percent: 40, detail: "step 2", updated: minutesAgo(15) }), NOW);
   assert.equal(p.view(stalled, NOW, 10).note, "no news for 15 min");
   assert.equal(p.view(stalled, NOW, 10).kind, "stalled");
