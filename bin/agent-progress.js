@@ -8,6 +8,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const cli = require("../lib/cli");
+const hookLib = require("../lib/hook");
 const { formatDuration } = require("../lib/progress");
 
 const HELP = `agent-progress: show a task in the Agent Progress Bar extension.
@@ -26,7 +27,9 @@ Report progress yourself:
   agent-progress remove <id>
 
 set keeps the fields it is not given, so "set build --done 42" is enough after the first call.
-Files go in ~/.agent-progress (AGENT_PROGRESS_DIR to change it).`;
+Files go in ~/.agent-progress (AGENT_PROGRESS_DIR to change it).
+
+  agent-progress hook   reads a Claude Code hook event on stdin (set up by "Connect Claude Code")`;
 
 function folder() {
   return process.env.AGENT_PROGRESS_DIR || path.join(os.homedir(), ".agent-progress");
@@ -180,6 +183,46 @@ function run(options, args) {
   });
 }
 
+/**
+ * A Claude Code hook event on stdin (lib/hook.js says what it writes). Prints nothing and never
+ * fails: whatever happens, Claude Code goes on as if the hook were not there.
+ */
+function hook() {
+  let event;
+  try {
+    event = JSON.parse(fs.readFileSync(0, "utf8"));
+  } catch {
+    return;
+  }
+  const existing = [];
+  const tool = hookLib.idOf(event && event.tool_use_id);
+  try {
+    // A command's events need its own card only; the end of a turn or a session needs them all.
+    const names = tool ? [`${tool}.json`] : fs.readdirSync(folder());
+    for (const name of names) {
+      if (!name.startsWith(hookLib.PREFIX) || !name.endsWith(".json")) continue;
+      const id = name.slice(0, -".json".length);
+      const data = read(id);
+      if (Object.keys(data).length) existing.push({ id, data });
+    }
+  } catch {
+    // No folder yet.
+  }
+  for (const change of hookLib.onEvent(event, new Date(), existing, formatDuration)) {
+    try {
+      if (change.onlyIfNew) {
+        fs.mkdirSync(folder(), { recursive: true });
+        // Written only if the end of the command did not come first (both hooks run at once).
+        fs.writeFileSync(fileOf(change.id), JSON.stringify(change.data, null, 1), { flag: "wx" });
+      } else {
+        write(change.id, { ...read(change.id), ...change.data });
+      }
+    } catch {
+      // Already there, or locked: the next event will do.
+    }
+  }
+}
+
 function main(argv) {
   const { options, words, command } = cli.parseArgs(argv);
   const action = words[0];
@@ -200,13 +243,21 @@ function main(argv) {
     case "remove":
       return fs.rmSync(fileOf(needId(words)), { force: true });
     default:
-      throw new Error(`unknown action "${action}" (run, set, done, fail, remove)`);
+      throw new Error(`unknown action "${action}" (run, set, done, fail, remove, hook)`);
   }
 }
 
-try {
-  main(process.argv.slice(2));
-} catch (error) {
-  console.error(`agent-progress: ${error.message}`);
-  process.exitCode = 2;
+if (process.argv[2] === "hook") {
+  try {
+    hook();
+  } catch {
+    // Never in Claude Code's way.
+  }
+} else {
+  try {
+    main(process.argv.slice(2));
+  } catch (error) {
+    console.error(`agent-progress: ${error.message}`);
+    process.exitCode = 2;
+  }
 }

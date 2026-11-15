@@ -168,3 +168,30 @@ test("the panel says how long a task has run, or when it ended", () => {
   assert.equal(p.view(stalled, NOW, 10).note, "no news for 15 min");
   assert.equal(p.view(stalled, NOW, 10).kind, "stalled");
 });
+
+test("a command found on its own shows once it has lasted, a quick one never", () => {
+  const auto = (fields) => p.parseTask("claude-x", JSON.stringify({ auto: true, heartbeat: false, ...fields }), NOW);
+  assert.equal(p.isShown(auto({ started: minutesAgo(0.25) }), NOW, 20), false, "running for 15 s");
+  assert.equal(p.isShown(auto({ started: minutesAgo(0.5) }), NOW, 20), true, "running for 30 s");
+  assert.equal(p.isShown(auto({ state: "done", started: minutesAgo(1), updated: minutesAgo(0.9) }), NOW, 20), false, "took 6 s");
+  assert.equal(p.isShown(auto({ state: "done", started: minutesAgo(3), updated: minutesAgo(1) }), NOW, 20), true, "took 2 min");
+  assert.equal(p.isShown(p.parseTask("a", JSON.stringify({ started: minutesAgo(0) }), NOW), NOW, 20), true, "a task that reports itself shows at once");
+});
+
+test("a task that says nothing while it runs is never called stalled", () => {
+  const quiet = p.parseTask("a", JSON.stringify({ heartbeat: false, started: minutesAgo(40), updated: minutesAgo(40) }), NOW);
+  assert.equal(p.kindOf(quiet, NOW, 10), "running");
+  assert.equal(p.view(quiet, NOW, 10).when, "running for 40 min");
+});
+
+test("an ended task: over, without saying how it went", () => {
+  const ended = p.parseTask("a", JSON.stringify({ title: "Build", state: "ended", started: minutesAgo(5), updated: minutesAgo(1) }), NOW);
+  const v = p.view(ended, NOW, 10);
+  assert.equal(v.kind, "ended");
+  assert.equal(v.percent, null, "no 100 %: it may not have finished its work");
+  assert.equal(v.removable, true);
+  assert.equal(v.leavesIn, 60);
+  assert.equal(p.statusText([ended], NOW), "$(circle-outline) Build ended");
+  const done = p.parseTask("b", JSON.stringify({ state: "done", updated: minutesAgo(1) }), NOW);
+  assert.equal(p.summaryText([ended, done], NOW, 10), "1 done · 1 ended");
+});

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- **Connect Claude Code**: hooks in Claude Code's settings show every command it runs that lasts (20 seconds by default, `agentProgress.commandsShowAfterSeconds`), without the agent having to remember anything. Foreground commands turn done or failed; background ones turn **ended** (grey) once Claude Code no longer lists them, since it does not say how they went. The change is shown side by side before it is written; **Disconnect Claude Code** takes it out. The hooks only watch and never slow Claude Code down.
+- A **Connections** page (the account button above the panel): Claude Code's account (name and masked address), its commands today, where the hooks are, and **Connect** or **Disconnect**. It lays itself out for the room it has.
+- The empty panel shows the extension's logo; **Connect Claude Code** takes Claude's colors; **How it works** becomes a link under the buttons.
+- The panel fits its box: when the cards do not fit (beside the terminal, a short panel, many tasks), each task becomes one line, with its buttons on hover or keyboard focus.
+- A new `ended` state, and two fields for tasks found without their help: `auto` (shown once it lasts) and `heartbeat: false` (no news is not a sign of being stuck).
+- The launchers stay quiet when a hook calls them after the extension is gone.
+
 ## 0.1.3
 
 - A button at the top of the panel puts it beside the terminal (side by side in the bottom panel); clicking it again puts it back in its own tab. If VS Code ever changes the way this works, the button opens VS Code's own "Move View" chooser instead.

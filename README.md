@@ -2,7 +2,7 @@
 
 When an AI agent starts something long in the background (a build, a big batch of files, model work...), you usually get no sign of life until it is over. This extension gives you one: a progress bar and the time left, in the VS Code status bar, with a panel of progress cards next to the terminal when you click it.
 
-It works with any agent, and with any command or script too: put `agent-progress run` in front of a command, or have a script write a small JSON file. The extension reads the progress folder once a second.
+It works with any agent, and with any command or script too: put `agent-progress run` in front of a command, or have a script write a small JSON file. With Claude Code, one click is enough: **Connect Claude Code**, and every command it runs that lasts shows up on its own. The extension reads the progress folder once a second.
 
 ![The Agent Progress panel next to the terminal: several tasks running, one stalled, one failed, two done](media/screenshot.png)
 
@@ -17,8 +17,9 @@ From the source: Command Palette, **Developer: Install Extension from Location..
 
 ## Getting started
 
-Open the **Agent Progress** panel (next to the terminal, or click the status bar). While nothing runs, it shows two buttons:
+Open the **Agent Progress** panel (next to the terminal, or click the status bar). While nothing runs, it shows these buttons:
 
+- **Connect Claude Code** (when Claude Code is on your computer, in Claude's colors): see [Claude Code: its commands, on their own](#claude-code-its-commands-on-their-own). Once connected, the panel says **Claude Code connected** instead; click it for the **Connections** page.
 - **Add agent instructions**: adds a short section to the file your AI agent reads, or copies it. The list offers `CLAUDE.md` (Claude Code), `AGENTS.md` (Codex, Copilot, Cursor and most others), `.cursor/rules/agent-progress.mdc` (a Cursor rule applied in every chat), `.github/copilot-instructions.md` (GitHub Copilot), `GEMINI.md` (Gemini CLI) and your global `~/.claude/CLAUDE.md`. It tells the agent to run its long commands through `agent-progress`. Before anything is written, the change shows side by side with your file, and you click **Add** or **Cancel** (in the panel, or the check and cross above the preview; closing the preview cancels); the rest of the file is left as it is, and Ctrl+Z in the editor undoes it. Clicking it again updates the section instead of adding a second one.
 - **How it works**: a short guide to show any command or script in the panel, without an AI agent.
 
@@ -26,6 +27,7 @@ Open the **Agent Progress** panel (next to the terminal, or click the status bar
 
 - In the status bar: `Voice packs 42% · 35 min left`, and `(+1)` when other tasks run too.
 - Click it: the **Agent Progress** panel opens next to the terminal (you can drag it to a side bar). The split button at its top puts it **beside the terminal**, both side by side in the bottom panel; clicking it again puts it back in its own tab. One card per task, with the count (`2,440 / 5,808 takes`), the time left, a detail line and how long it has run. Several agents at once each get their own card: running tasks first, then stalled, failed and done.
+- When the cards do not fit (beside the terminal, a short panel, many tasks), they turn into rows: one line per task with its name, what it is doing, the percentage, the time left and a thin bar. Hover a row (or reach it with the keyboard) for its buttons and the rest of its story.
 - **Open log** on a card opens the log the task writes, scrolled to the latest lines: what the agent is doing right now. **Remove** takes a finished, failed or stalled task off the list.
 - The time left follows the speed of the last 3 minutes, so it adjusts when a task speeds up or slows down. Hover it to see where the estimate comes from.
 - A task with no news for 10 minutes is shown as stalled (yellow).
@@ -87,9 +89,11 @@ Write one JSON file per task in `~/.agent-progress/` (on Windows: `C:\Users\<you
 | `detail` | no | One line about what is happening right now. |
 | `started` | for the time left | When the task started (ISO 8601). Used for the time left until the extension has seen a few minutes of progress. |
 | `eta_seconds` | no | Your own estimate of the time left, if you know better. |
-| `state` | no | `running` (default), `done` or `failed`. |
+| `state` | no | `running` (default), `done`, `failed`, or `ended` (over, without knowing how it went). |
 | `log` | no | A log file the task writes, for the **Open log** button. Absolute, `~/...`, or relative to the progress folder. |
 | `updated` | no | Last update (ISO 8601). Default: the file's modification time. |
+| `heartbeat` | no | `false`: the task says nothing while it runs, so no news does not mean it is stuck. |
+| `auto` | no | `true`: found without the task's help (the Claude Code hook). Shown once it has lasted a while, quick ones never. |
 
 Without `done`/`total` or `percent`, the bar just moves to show the task is alive. Write the file in one go (write to a temporary file, then rename) so it is never read half-written; if it is, the extension keeps the previous value.
 
@@ -134,6 +138,28 @@ Click **Add agent instructions** in the empty panel (or **Agent Progress: Add Ag
 
 An agent can also write the JSON file itself, as described above.
 
+## Claude Code: its commands, on their own
+
+![Three panels: 1, the empty panel with Connect Claude Code; 2, Claude Code's long commands showing up on their own, one running in the background; 3, the Connections page with the account, the commands of the day and Disconnect](media/claude-code.png)
+
+Instructions only work when the agent remembers them. With Claude Code you can skip that: click **Connect Claude Code** in the empty panel (or **Agent Progress: Connect Claude Code** in the Command Palette). It adds hooks to Claude Code's settings (`~/.claude/settings.json`): small calls Claude Code makes before and after each command it runs. As with the instructions, the change shows side by side first and nothing is written before **Connect**. Claude Code picks it up right away, no restart.
+
+From then on:
+
+- A command Claude Code runs gets a card once it has lasted 20 seconds (`agentProgress.commandsShowAfterSeconds`); quicker ones never show. The title is the description Claude gave the command.
+- A command in the foreground turns done or failed when it ends, with how long it took or the first line of the error.
+- A command in the **background** runs until Claude Code no longer lists it at the end of its turn. Claude Code does not say how a background command ended, so its card says **ended** (grey) instead of done or failed. Commands run through `agent-progress run` already have their own card and get no second one.
+
+The hooks only watch: they never change a command, never answer a permission prompt, and Claude Code does not wait for them (`"async": true`). If the extension is uninstalled, they stay quiet.
+
+The account button at the top of the panel opens the **Connections** page (click it again, or the arrow, to go back to the tasks). Claude Code's row shows the account it is signed in with (its name and the address, masked: `al•••@example.com`), how many commands it ran today and how many lasted long enough to show, the last one, where the hooks are (click to open the file) and the shell that runs them. **Disconnect** takes the hooks out, shown side by side first like Connect; **Agent Progress: Disconnect Claude Code** in the Command Palette does the same. The row lays itself out for the room it has: in a narrow panel, one short line with **Show more** for the rest; in a wide one, all the details on one line.
+
+To add them by hand (if your settings file has comments, the extension leaves it alone), put this in the `hooks` of `~/.claude/settings.json`, once for each of `PreToolUse`, `PostToolUse`, `PostToolUseFailure` (with `"matcher": "Bash|PowerShell"`) and `Stop`, `SubagentStop`, `SessionEnd` (without a matcher):
+
+```json
+{ "matcher": "Bash|PowerShell", "hooks": [{ "type": "command", "command": "\"$HOME/.agent-progress/bin/agent-progress\" hook", "async": true, "timeout": 30 }] }
+```
+
 ## Settings
 
 Click the gear at the top of the **Agent Progress** panel, or press `Ctrl+,` (`Cmd+,` on macOS) and type `agent progress`. Changes apply right away.
@@ -145,10 +171,11 @@ Click the gear at the top of the **Agent Progress** panel, or press `Ctrl+,` (`C
 | `agentProgress.keepFinishedMinutes` | `2` | How long a finished task stays in the list. |
 | `agentProgress.deleteFilesAfterHours` | `24` | Progress files with no update for this long are deleted. `0`: never. |
 | `agentProgress.notify` | `true` | Notification when a task finishes or fails. |
+| `agentProgress.commandsShowAfterSeconds` | `20` | With Claude Code connected, a command shows once it has lasted this long. |
 
 ## Privacy
 
-The extension reads the progress folder and the log files the tasks point to. It writes only its two launchers in `~/.agent-progress/bin`, deletes finished task files when you ask it to, and edits an agent's instruction file only when you pick it in **Add agent instructions**. It never connects to the network and collects nothing.
+The extension reads the progress folder and the log files the tasks point to. It writes only its two launchers in `~/.agent-progress/bin`, deletes finished task files when you ask it to (and at once the cards of quick Claude Code commands, which never show), edits an agent's instruction file only when you pick it in **Add agent instructions**, and Claude Code's settings only when you click **Connect** or **Disconnect**. The Claude Code hook writes one small file per command in the progress folder, with its description and the start of the command line. For the Connections page, it reads the name and address of the account Claude Code is signed in with from Claude Code's own `~/.claude.json`, and shows the address masked; it remembers how many Claude Code commands it saw today, in VS Code's storage for the extension. It never connects to the network and collects nothing.
 
 ## License
 

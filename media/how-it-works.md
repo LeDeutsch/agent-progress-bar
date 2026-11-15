@@ -35,7 +35,11 @@ Use `agent-progress fail export --detail "disk full"` if it goes wrong. `set` ke
 
 A script can also write the file itself: see the README for the format.
 
-## With an AI agent
+## With Claude Code
+
+Click **Connect Claude Code** in the empty panel, or run **Agent Progress: Connect Claude Code** from the Command Palette. You see the change to Claude Code's settings before anything is written. From then on, every command Claude Code runs that lasts more than 20 seconds shows here on its own, without Claude having to remember anything. A command it sends to the background turns grey (**ended**) once Claude Code no longer lists it: Claude Code does not say how it went. The account button at the top of the panel opens the **Connections** page: the Claude Code account in use, what it ran today, and **Disconnect** to take it back out. The README shows the hooks to add by hand if your settings file has comments.
+
+## With any AI agent
 
 Click **Add agent instructions** in the empty panel, or run **Agent Progress: Add Agent Instructions** from the Command Palette. It adds a short section to the file your agent reads (`CLAUDE.md` for Claude Code, `AGENTS.md` for most others, or the own file of Cursor, Copilot or Gemini), telling it to run its long commands through `agent-progress`. You see the change next to your file before anything is written, and Ctrl+Z undoes it. From then on, its long tasks show up here.
 
@@ -47,8 +51,9 @@ Click **Add agent instructions** in the empty panel, or run **Agent Progress: Ad
 | Yellow | No news for 10 minutes: maybe stuck. |
 | Red | Failed. |
 | Green | Done. |
+| Grey | Ended, without knowing how (a background command of Claude Code). |
 
-A finished card (green or red) leaves the list after 2 minutes: the line at its bottom empties until then.
+A finished card leaves the list after 2 minutes: the line at its bottom empties until then. When the cards do not fit (beside the terminal, a short panel), they turn into one line per task: hover a line for its buttons and details.
 
 Hover the time left to see how it is estimated. **Remove** takes a finished, failed or stuck task off the list. The status bar shows the oldest running task, and `(+2)` when others run too.
 

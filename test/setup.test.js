@@ -91,3 +91,22 @@ test("the launcher runs the command, and VS Code's switch does not reach the wra
   assert.equal(data.state, "done");
   assert.match(fs.readFileSync(data.log, "utf8"), /^ELECTRON_RUN_AS_NODE=unset$/m);
 });
+
+test("through the launcher, the hook writes its card, and stays quiet once the extension is gone", { skip: !windows }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-progress-launcher-"));
+  const env = { ...process.env, AGENT_PROGRESS_DIR: dir };
+  const event = JSON.stringify({ session_id: "s", hook_event_name: "PreToolUse", tool_name: "Bash", tool_use_id: "toolu_1", tool_input: { command: "cargo build" } });
+  const launch = (script) => {
+    const cmd = path.join(dir, "agent-progress.cmd");
+    fs.writeFileSync(cmd, setup.launchers({ runtime: process.execPath, script, folder: null, windows: true })["agent-progress.cmd"]);
+    return spawnSync("cmd.exe", ["/d", "/c", cmd, "hook"], { env, input: event, encoding: "utf8" });
+  };
+  const ok = launch(SCRIPT);
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, "claude-toolu_1.json"), "utf8")).title, "cargo build");
+  const gone = launch(path.join(dir, "uninstalled", "agent-progress.js"));
+  assert.equal(gone.status, 0, "Claude Code sees no error");
+  assert.equal(gone.stdout + gone.stderr, "");
+  const sh = setup.launchers({ runtime: "C:\\VS Code\\Code.exe", script: "C:\\ext\\bin\\agent-progress.js", folder: null, windows: true })["agent-progress"];
+  assert.match(sh, /if \[ "\$1" = hook \] && \{ \[ ! -f "C:\/VS Code\/Code\.exe" \] \|\| \[ ! -f "C:\/ext\/bin\/agent-progress\.js" \]; \}; then exit 0; fi/);
+});

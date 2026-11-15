@@ -10,6 +10,7 @@ const path = require("path");
 const progress = require("./lib/progress");
 const { panelHtml } = require("./lib/panel");
 const setup = require("./lib/setup");
+const claude = require("./lib/claude");
 
 const REFRESH_MS = 1000;
 const VIEW_ID = "agentProgress.view";
@@ -37,6 +38,7 @@ function settings() {
     notify: config.get("notify", true),
     keepFinishedMinutes: config.get("keepFinishedMinutes", progress.KEEP_FINISHED_MINUTES),
     deleteAfterHours: config.get("deleteFilesAfterHours", 24),
+    showAfterSeconds: config.get("commandsShowAfterSeconds", 20),
   };
 }
 
@@ -56,7 +58,7 @@ function deleteOld(task, folder) {
  * (the setting) are deleted on the way, so the folder does not fill up.
  */
 function readTasks(now) {
-  const { folder, keepFinishedMinutes, deleteAfterHours } = settings();
+  const { folder, keepFinishedMinutes, deleteAfterHours, showAfterSeconds } = settings();
   let names = [];
   try {
     names = fs.readdirSync(folder).filter((name) => name.endsWith(".json"));
@@ -73,6 +75,16 @@ function readTasks(now) {
       if (!task) continue;
       if (progress.isOld(task, now, deleteAfterHours)) {
         deleteOld(task, folder);
+        continue;
+      }
+      const shown = progress.isShown(task, now, showAfterSeconds);
+      countClaude(task, shown);
+      // A command found on its own that was quick: never shown, its file goes at once.
+      if (!shown) {
+        if (task.state !== "running") {
+          fs.rmSync(file, { force: true });
+          forget(id);
+        }
         continue;
       }
       lastGood.set(id, task);
@@ -95,6 +107,7 @@ function notifyEnds(tasks) {
     if (!notify || before !== "running") continue;
     if (task.state === "done") vscode.window.showInformationMessage(`${task.title}: done`);
     if (task.state === "failed") vscode.window.showErrorMessage(`${task.title}: failed`);
+    if (task.state === "ended") vscode.window.showInformationMessage(`${task.title}: ended`);
   }
 }
 
@@ -119,6 +132,9 @@ function refresh() {
   if (view && view.visible) {
     view.webview.postMessage({
       confirm: pending ? { question: pending.question, ok: pending.ok } : null,
+      claude: claudeState(),
+      page,
+      connections: page === "connections" ? [claudeConnection(now)] : [],
       summary: progress.summaryText(tasks, now, staleMinutes),
       tasks: progress
         .panelOrder(tasks, now, staleMinutes)
@@ -292,7 +308,6 @@ async function addInstructions() {
   }
 
   const uri = vscode.Uri.file(pick.file);
-  const name = path.basename(pick.file);
   try {
     const doc = pick.exists ? await vscode.workspace.openTextDocument(uri) : null;
     // An open file with unsaved changes: the preview and the edit start from what the editor shows.
@@ -303,42 +318,232 @@ async function addInstructions() {
       return;
     }
 
-    const proposed = previewUri(name, after);
-    const current = doc ? uri : previewUri(name, "");
-    await vscode.commands.executeCommand("vscode.diff", current, proposed, `${pick.label}: now / with the agent instructions`, { preview: true });
     const question = replaced ? `Update the agent instructions in ${pick.label}?` : `Add these lines to ${pick.label}?`;
-    const answer = await ask(question, replaced ? "Update" : "Add", proposed);
-    await closePreview(proposed, current);
-    if (answer !== "ok") return;
-    const now = doc ? doc.getText() : fs.existsSync(pick.file) ? null : "";
-    if (now !== before) {
-      vscode.window.showWarningMessage(`${pick.label} changed while the preview was open: nothing was written. Try again.`);
-      return;
-    }
-
-    const edit = new vscode.WorkspaceEdit();
-    if (!doc) {
-      fs.mkdirSync(path.dirname(pick.file), { recursive: true });
-      edit.createFile(uri, { ignoreIfExists: true });
-      edit.insert(uri, new vscode.Position(0, 0), after);
-    } else {
-      const change = setup.changedRange(before, after);
-      edit.replace(uri, new vscode.Range(doc.positionAt(change.start), doc.positionAt(change.end)), change.text);
-    }
-    const wasDirty = Boolean(doc && doc.isDirty);
-    if (!(await vscode.workspace.applyEdit(edit))) throw new Error("VS Code refused the edit");
-    const result = await vscode.workspace.openTextDocument(uri);
-    // Saved, unless the user had unsaved changes of their own in that file: those stay theirs to save.
-    if (!wasDirty) await result.save();
-    const editor = await vscode.window.showTextDocument(result, { preview: false });
-    const at = result.positionAt(result.getText().indexOf(setup.START));
-    editor.selection = new vscode.Selection(at, at);
-    editor.revealRange(new vscode.Range(at, at), vscode.TextEditorRevealType.AtTop);
     const done = replaced ? "updated in" : "added to";
-    const note = wasDirty ? " The file has unsaved changes: save it to keep them." : " Ctrl+Z in the editor undoes it.";
-    vscode.window.showInformationMessage(`Agent instructions ${done} ${pick.label}.${note}`);
+    await previewAndWrite({
+      file: pick.file,
+      label: pick.label,
+      doc,
+      before,
+      after,
+      title: `${pick.label}: now / with the agent instructions`,
+      question,
+      ok: replaced ? "Update" : "Add",
+      revealAt: setup.START,
+      doneText: `Agent instructions ${done} ${pick.label}.`,
+    });
   } catch (error) {
     vscode.window.showWarningMessage(`Could not change ${pick.file}: ${error.message}`);
+  }
+}
+
+/**
+ * Shows a change to `file` side by side (now / after), and writes it only once the user agrees.
+ * The edit goes through the editor, so Ctrl+Z undoes it, and an open file with unsaved changes
+ * keeps them. Returns true when written.
+ */
+async function previewAndWrite({ file, label, doc, before, after, title, question, ok, revealAt, doneText }) {
+  const uri = vscode.Uri.file(file);
+  const name = path.basename(file);
+  const proposed = previewUri(name, after);
+  const current = doc ? uri : previewUri(name, "");
+  await vscode.commands.executeCommand("vscode.diff", current, proposed, title, { preview: true });
+  const answer = await ask(question, ok, proposed);
+  await closePreview(proposed, current);
+  if (answer !== "ok") return false;
+  const now = doc ? doc.getText() : fs.existsSync(file) ? null : "";
+  if (now !== before) {
+    vscode.window.showWarningMessage(`${label} changed while the preview was open: nothing was written. Try again.`);
+    return false;
+  }
+
+  const edit = new vscode.WorkspaceEdit();
+  if (!doc) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    edit.createFile(uri, { ignoreIfExists: true });
+    edit.insert(uri, new vscode.Position(0, 0), after);
+  } else {
+    const change = setup.changedRange(before, after);
+    edit.replace(uri, new vscode.Range(doc.positionAt(change.start), doc.positionAt(change.end)), change.text);
+  }
+  const wasDirty = Boolean(doc && doc.isDirty);
+  if (!(await vscode.workspace.applyEdit(edit))) throw new Error("VS Code refused the edit");
+  const result = await vscode.workspace.openTextDocument(uri);
+  // Saved, unless the user had unsaved changes of their own in that file: those stay theirs to save.
+  if (!wasDirty) await result.save();
+  const editor = await vscode.window.showTextDocument(result, { preview: false });
+  const found = revealAt ? result.getText().indexOf(revealAt) : -1;
+  const at = result.positionAt(Math.max(0, found));
+  editor.selection = new vscode.Selection(at, at);
+  editor.revealRange(new vscode.Range(at, at), vscode.TextEditorRevealType.AtTop);
+  const note = wasDirty ? " The file has unsaved changes: save it to keep them." : " Ctrl+Z in the editor undoes it.";
+  vscode.window.showInformationMessage(`${doneText}${note}`);
+  return true;
+}
+
+/** Claude Code's own settings, where its hooks go. */
+function claudeSettingsFile() {
+  return path.join(os.homedir(), ".claude", "settings.json");
+}
+
+let claudeCache = { mtime: -1, state: "missing" };
+
+/**
+ * "connected" (the hooks are in Claude Code's settings), "available" (Claude Code is there, not
+ * connected) or "missing". The file is read again only when it changes.
+ */
+function claudeState() {
+  const file = claudeSettingsFile();
+  try {
+    const mtime = fs.statSync(file).mtimeMs;
+    if (mtime !== claudeCache.mtime) {
+      claudeCache = { mtime, state: claude.isConnected(fs.readFileSync(file, "utf8")) ? "connected" : "available" };
+    }
+    return claudeCache.state;
+  } catch {
+    return fs.existsSync(path.dirname(file)) ? "available" : "missing";
+  }
+}
+
+/** Whether Claude Code has Git Bash to run hooks with (always "yes" outside Windows). */
+function hasBash() {
+  return process.platform !== "win32" || claude.hasGitBash(process.env, (file) => fs.existsSync(file));
+}
+
+/** How Claude Code will call the hook on this machine. */
+function hookCall() {
+  return claude.hookCall({ bin: path.join(settings().folder, "bin"), windows: process.platform === "win32", bash: hasBash() });
+}
+
+/** The page the panel shows: the tasks, or the Connections (the account button above the panel). */
+let page = "tasks";
+
+function showPage(next) {
+  page = next;
+  refresh();
+}
+
+function toggleConnections() {
+  page = page === "connections" ? "tasks" : "connections";
+  if (view) view.show(false);
+  else showPanel();
+  refresh();
+}
+
+/** Reads a small file again only when it changes: { file: { mtime, value } }. */
+const fileCache = new Map();
+function cached(file, read) {
+  try {
+    const mtime = fs.statSync(file).mtimeMs;
+    const hit = fileCache.get(file);
+    if (hit && hit.mtime === mtime) return hit.value;
+    const value = read(fs.readFileSync(file, "utf8"));
+    fileCache.set(file, { mtime, value });
+    return value;
+  } catch {
+    return read("");
+  }
+}
+
+/** The Connections page's row for Claude Code. */
+function claudeConnection(now) {
+  const state = claudeState();
+  const settingsText = cached(claudeSettingsFile(), (text) => text);
+  // The account Claude Code is signed in with: its name and its address, masked.
+  const who = cached(path.join(os.homedir(), ".claude.json"), (text) => claude.account(text));
+  const today = stats && stats.day === dayOf(now) ? stats : null;
+  return claude.connectionView({
+    state,
+    account: who,
+    stats: today ? { seen: today.seen.length, shown: today.shown.length, last: today.last } : { seen: 0, shown: 0, last: null },
+    shell: claude.shellName(settingsText, { windows: process.platform === "win32", bash: hasBash() }),
+    now,
+    formatDuration: progress.formatDuration,
+  });
+}
+
+/** Today's Claude Code commands, for the Connections page: { day, seen: [ids], shown: [ids], last }. */
+const STATS_KEY = "agentProgress.claudeToday";
+let stats = null;
+
+function dayOf(ms) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+/** Counts a command of Claude Code (a "claude-" card) the first time it is seen, and once shown. */
+function countClaude(task, shown) {
+  if (!task.id.startsWith("claude-") || task.started === null) return;
+  const day = dayOf(task.started);
+  if (day !== dayOf(Date.now())) return;
+  if (!stats || stats.day !== day) stats = { day, seen: [], shown: [], last: null };
+  let changed = false;
+  if (!stats.seen.includes(task.id)) {
+    stats.seen.push(task.id);
+    changed = true;
+  }
+  if (shown && !stats.shown.includes(task.id)) {
+    stats.shown.push(task.id);
+    changed = true;
+  }
+  if (!stats.last || task.started > stats.last.at) {
+    stats.last = { title: task.title, at: task.started };
+    changed = true;
+  }
+  if (changed && memory) memory.update(STATS_KEY, stats);
+}
+
+/**
+ * Connects Claude Code: adds hooks to its settings so every command it runs is seen, and the ones
+ * that last show in the panel on their own. Shown side by side first; nothing is written before Connect.
+ */
+async function connectClaude() {
+  await changeClaude(
+    (text) => claude.connect(text, hookCall()),
+    {
+      title: "Claude Code settings: now / connected",
+      question: "Connect Claude Code? Its commands that last will show here on their own.",
+      ok: "Connect",
+      doneText: "Claude Code connected: the commands it runs from now on show here once they last.",
+      same: "Claude Code is already connected.",
+    },
+  );
+}
+
+/** Takes the hooks out of Claude Code's settings, shown side by side first. */
+async function disconnectClaude() {
+  await changeClaude((text) => claude.disconnect(text), {
+    title: "Claude Code settings: now / disconnected",
+    question: "Disconnect Claude Code?",
+    ok: "Disconnect",
+    doneText: "Claude Code disconnected.",
+    same: "Claude Code is not connected.",
+  });
+}
+
+async function changeClaude(change, { title, question, ok, doneText, same }) {
+  const file = claudeSettingsFile();
+  const label = "~/.claude/settings.json";
+  try {
+    const exists = fs.existsSync(file);
+    const doc = exists ? await vscode.workspace.openTextDocument(vscode.Uri.file(file)) : null;
+    const before = doc ? doc.getText() : "";
+    let after;
+    try {
+      after = change(before);
+    } catch {
+      vscode.window.showWarningMessage(`${label} is not plain JSON: nothing was changed. "How it works" shows the hooks to add by hand.`);
+      return;
+    }
+    if (after === before || (ok === "Disconnect" && !claude.isConnected(before))) {
+      vscode.window.showInformationMessage(same);
+      return;
+    }
+    await previewAndWrite({ file, label, doc, before, after, title, question, ok, revealAt: '"hooks"', doneText });
+    claudeCache.mtime = -1;
+    refresh();
+  } catch (error) {
+    vscode.window.showWarningMessage(`Could not change ${file}: ${error.message}`);
   }
 }
 
@@ -390,6 +595,13 @@ function onViewMessage(message) {
   if (!message || typeof message !== "object") return;
   if (message.cmd === "ready") return refresh();
   if (message.cmd === "setup") return addInstructions();
+  if (message.cmd === "claude") return connectClaude();
+  if (message.cmd === "disconnect") return disconnectClaude();
+  if (message.cmd === "connections") return showPage("connections");
+  if (message.cmd === "tasks") return showPage("tasks");
+  if (message.cmd === "claude-settings") {
+    return vscode.window.showTextDocument(vscode.Uri.file(claudeSettingsFile())).then(undefined, () => undefined);
+  }
   if (message.cmd === "guide") return howItWorks();
   if (message.cmd === "confirm") return pending?.settle("ok");
   if (message.cmd === "cancel") return pending?.settle("cancel");
@@ -447,6 +659,9 @@ function activate(context) {
     vscode.commands.registerCommand("agentProgress.clearFinished", clearFinished),
     vscode.commands.registerCommand("agentProgress.openFolder", openFolder),
     vscode.commands.registerCommand("agentProgress.addInstructions", addInstructions),
+    vscode.commands.registerCommand("agentProgress.connectClaude", connectClaude),
+    vscode.commands.registerCommand("agentProgress.disconnectClaude", disconnectClaude),
+    vscode.commands.registerCommand("agentProgress.connections", toggleConnections),
     vscode.workspace.registerTextDocumentContentProvider(PREVIEW_SCHEME, {
       provideTextDocumentContent: (uri) => previews.get(uri.path) ?? "",
     }),
@@ -475,6 +690,7 @@ function activate(context) {
   // Where the panel was left last time (beside the terminal or in its own tab): the button
   // above it shows the move that makes sense.
   memory = context.globalState;
+  stats = memory.get(STATS_KEY, null);
   vscode.commands.executeCommand("setContext", BESIDE_KEY, memory.get(BESIDE_KEY, false));
   // The agent-progress command: launchers in a fixed place, and in every terminal VS Code opens.
   const launchers = installLaunchers(context);

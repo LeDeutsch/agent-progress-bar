@@ -37,7 +37,7 @@ test("options, words and the command after --", () => {
   assert.deepEqual([bare.options, bare.words, bare.command], [{ title: "Tests" }, ["run"], ["cargo", "test", "--release"]]);
   assert.throws(() => cli.parseArgs(["set", "a", "--total", "lots"]), /--total needs a number/);
   assert.throws(() => cli.parseArgs(["set", "a", "--colour", "red"]), /unknown option --colour/);
-  assert.throws(() => cli.parseArgs(["set", "a", "--state", "paused"]), /running, done or failed/);
+  assert.throws(() => cli.parseArgs(["set", "a", "--state", "paused"]), /running, done, failed or ended/);
 });
 
 test("progress is read from the output, dates are not counts", () => {
