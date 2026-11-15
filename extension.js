@@ -8,6 +8,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const progress = require("./lib/progress");
+const { panelHtml } = require("./lib/panel");
 
 const REFRESH_MS = 1000;
 
@@ -73,7 +74,7 @@ function refresh() {
   const { staleMinutes } = settings();
   const tasks = readTasks(now);
   notifyEnds(tasks);
-  const text = progress.statusText(tasks, now);
+  const text = progress.statusText(tasks, now, staleMinutes);
   if (text) {
     statusItem.text = text;
     const lines = tasks.map((task) => {
@@ -87,64 +88,15 @@ function refresh() {
     statusItem.hide();
   }
   if (panel) {
-    panel.webview.postMessage({ tasks: tasks.map((task) => progress.view(task, now, staleMinutes)) });
+    panel.webview.postMessage({
+      summary: progress.summaryText(tasks, now, staleMinutes),
+      tasks: progress.panelOrder(tasks, now, staleMinutes).map((task) => progress.view(task, now, staleMinutes)),
+    });
   }
 }
 
 function nonce() {
   return Array.from({ length: 24 }, () => Math.floor(Math.random() * 36).toString(36)).join("");
-}
-
-function panelHtml() {
-  const n = nonce();
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${n}'; script-src 'nonce-${n}';">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style nonce="${n}">
-  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 12px 16px; }
-  .task { padding: 12px 0; border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,.25)); }
-  .head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-  .title { font-weight: 600; font-size: 1.05em; }
-  .pct { font-variant-numeric: tabular-nums; font-weight: 600; }
-  .bar { height: 8px; border-radius: 4px; background: var(--vscode-editorWidget-background, rgba(128,128,128,.2)); overflow: hidden; margin: 8px 0 6px; }
-  .fill { height: 100%; background: var(--vscode-progressBar-background, #0e70c0); transition: width .4s; }
-  .done .fill { background: var(--vscode-testing-iconPassed, #3fb950); }
-  .failed .fill { background: var(--vscode-errorForeground, #f14c4c); }
-  .unknown .fill { width: 30% !important; animation: slide 1.4s ease-in-out infinite; }
-  @keyframes slide { from { margin-left: -30%; } to { margin-left: 100%; } }
-  .meta { display: flex; justify-content: space-between; gap: 12px; color: var(--vscode-descriptionForeground); font-size: .92em; }
-  .left { color: var(--vscode-foreground); }
-  .stale { color: var(--vscode-editorWarning-foreground, #cca700); }
-  .empty { color: var(--vscode-descriptionForeground); }
-</style>
-</head>
-<body>
-<div id="tasks"><p class="empty">No task running.</p></div>
-<script nonce="${n}">
-  const box = document.getElementById("tasks");
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  window.addEventListener("message", (event) => {
-    const tasks = event.data.tasks || [];
-    if (!tasks.length) { box.innerHTML = '<p class="empty">No task running.</p>'; return; }
-    box.innerHTML = tasks.map((t) => {
-      const known = t.percent !== null;
-      const state = t.state === "running" ? (known ? "" : "unknown") : t.state;
-      const right = t.state === "done" ? "done" : t.state === "failed" ? "failed" : known ? t.percent + "%" : "";
-      const note = t.stale ? '<span class="stale">no news for ' + esc(t.updatedAgo) + '</span>' : esc(t.detail);
-      return '<div class="task ' + state + '">' +
-        '<div class="head"><span class="title">' + esc(t.title) + '</span><span class="pct">' + right + '</span></div>' +
-        '<div class="bar"><div class="fill" style="width:' + (known ? t.percent : 100) + '%"></div></div>' +
-        '<div class="meta"><span>' + esc(t.count) + '</span><span class="left">' + esc(t.left) + '</span></div>' +
-        (note ? '<div class="meta"><span>' + note + '</span></div>' : '') +
-        '</div>';
-    }).join("");
-  });
-</script>
-</body>
-</html>`;
 }
 
 function showPanel() {
@@ -156,7 +108,7 @@ function showPanel() {
     enableScripts: true,
     localResourceRoots: [],
   });
-  panel.webview.html = panelHtml();
+  panel.webview.html = panelHtml(nonce());
   panel.onDidDispose(() => {
     panel = undefined;
   });

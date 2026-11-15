@@ -13,9 +13,13 @@ It works with any agent, and with any script too: the task writes a small JSON f
 ## What you see
 
 - In the status bar: `Voice packs 42% · 35 min left`, and `(+1)` when other tasks run too.
-- Click it: a panel with one bar per task, the count (`2,440 / 5,808 takes`), the time left and a detail line.
-- A task with no news for 10 minutes is shown as stalled.
+- Click it: a panel with one card per task, the count (`2,440 / 5,808 takes`), the time left, a detail line and how long it has run. Several agents at once each get their own card: running tasks first, then stalled, failed and done.
+- A task with no news for 10 minutes is shown as stalled (yellow).
 - A notification when a task finishes or fails.
+
+## Try it
+
+`npm run demo` writes a few fake tasks for 90 seconds: a count with the time left, several tasks at once, a task with no known progress, a failure, a stalled task. Watch the status bar and click it.
 
 ## Reporting progress
 

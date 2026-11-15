@@ -67,10 +67,46 @@ test("the status bar shows the oldest running task, then how many others", () =>
   assert.equal(p.statusText([], NOW), "");
 });
 
+test("a stalled task never hides the tasks that are moving", () => {
+  const stalled = p.parseTask("s", JSON.stringify({ title: "Old", percent: 40, started: minutesAgo(30), updated: minutesAgo(15) }), NOW);
+  const moving = p.parseTask("m", JSON.stringify({ title: "Build", done: 25, total: 100, started: minutesAgo(20) }), NOW);
+  assert.equal(p.statusText([stalled, moving], NOW, 10), "$(sync~spin) Build 25% · 1 h 00 min left (+1)");
+  assert.equal(p.statusText([stalled], NOW, 10), "$(warning) Old: no news for 15 min");
+  assert.equal(p.view(stalled, NOW, 10).left, "", "no time left for a stalled task");
+});
+
 test("the panel view counts with separators and the unit", () => {
   const task = p.parseTask("a", JSON.stringify({ done: 1452, total: 5808, unit: "takes", detail: "Eva" }), NOW);
   const v = p.view(task, NOW, 10);
   assert.equal(v.count, "1,452 / 5,808 takes");
   assert.equal(v.percent, 25);
   assert.equal(v.detail, "Eva");
+});
+
+test("the panel lists moving tasks first, then stalled, failed and done", () => {
+  const task = (id, fields) => p.parseTask(id, JSON.stringify(fields), NOW);
+  const tasks = [
+    task("done-old", { state: "done", updated: minutesAgo(4) }),
+    task("late", { percent: 10, started: minutesAgo(2) }),
+    task("failed", { state: "failed", updated: minutesAgo(1) }),
+    task("stalled", { percent: 40, started: minutesAgo(60), updated: minutesAgo(15) }),
+    task("done-new", { state: "done", updated: minutesAgo(1) }),
+    task("early", { percent: 50, started: minutesAgo(30) }),
+  ];
+  const order = p.panelOrder(tasks, NOW, 10).map((t) => t.id);
+  assert.deepEqual(order, ["early", "late", "stalled", "failed", "done-new", "done-old"]);
+  assert.equal(p.summaryText(tasks, NOW, 10), "2 running · 1 stalled · 1 failed · 2 done");
+  assert.equal(p.summaryText([tasks[0]], NOW, 10), "", "no summary for a single task");
+});
+
+test("the panel says how long a task has run, or when it ended", () => {
+  const running = p.parseTask("a", JSON.stringify({ percent: 50, started: minutesAgo(12) }), NOW);
+  assert.equal(p.view(running, NOW, 10).when, "running for 12 min");
+  const done = p.parseTask("b", JSON.stringify({ state: "done", started: minutesAgo(30), updated: minutesAgo(3) }), NOW);
+  const v = p.view(done, NOW, 10);
+  assert.equal(v.when, "3 min ago");
+  assert.equal(v.whenHint, "Took 27 min");
+  const stalled = p.parseTask("c", JSON.stringify({ percent: 40, detail: "step 2", updated: minutesAgo(15) }), NOW);
+  assert.equal(p.view(stalled, NOW, 10).note, "no news for 15 min");
+  assert.equal(p.view(stalled, NOW, 10).kind, "stalled");
 });
