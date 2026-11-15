@@ -37,7 +37,7 @@ A script can also write the file itself: see the README for the format.
 
 ## With an AI agent
 
-Click **Add agent instructions** in the empty panel, or run **Agent Progress: Add Agent Instructions** from the Command Palette. It adds a short section to the file your agent reads (`CLAUDE.md` for Claude Code, `AGENTS.md` for most others), telling it to run its long commands through `agent-progress`. You see the change next to your file before anything is written, and Ctrl+Z undoes it. From then on, its long tasks show up here.
+Click **Add agent instructions** in the empty panel, or run **Agent Progress: Add Agent Instructions** from the Command Palette. It adds a short section to the file your agent reads (`CLAUDE.md` for Claude Code, `AGENTS.md` for most others, or the own file of Cursor, Copilot or Gemini), telling it to run its long commands through `agent-progress`. You see the change next to your file before anything is written, and Ctrl+Z undoes it. From then on, its long tasks show up here.
 
 ## What you see
 

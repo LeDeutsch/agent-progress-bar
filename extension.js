@@ -251,15 +251,13 @@ async function addInstructions() {
   const block = setup.instructions(settings().customFolder);
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const choices = [];
-  const target = (label, description, file) => {
+  for (const t of setup.TARGETS) {
+    if (!t.home && !root) continue;
+    const file = path.join(t.home ? os.homedir() : root, ...t.path);
     const exists = fs.existsSync(file);
-    choices.push({ label, description, detail: exists ? `Adds a section at the end of ${file}` : `Creates ${file}`, file, exists });
-  };
-  if (root) {
-    target("CLAUDE.md", "Claude Code, this project", path.join(root, "CLAUDE.md"));
-    target("AGENTS.md", "Codex, Copilot, Cursor and most other agents, this project", path.join(root, "AGENTS.md"));
+    const detail = exists ? `Adds a section at the end of ${file}` : `Creates ${file}`;
+    choices.push({ label: t.label, description: t.description, detail, file, exists, header: t.header || "" });
   }
-  target("~/.claude/CLAUDE.md", "Claude Code, every project", path.join(os.homedir(), ".claude", "CLAUDE.md"));
   choices.push({ label: "Copy to clipboard", description: "Paste it where your agent reads its instructions", file: null });
   const pick = await vscode.window.showQuickPick(choices, {
     title: "Add agent instructions",
@@ -278,7 +276,7 @@ async function addInstructions() {
     const doc = pick.exists ? await vscode.workspace.openTextDocument(uri) : null;
     // An open file with unsaved changes: the preview and the edit start from what the editor shows.
     const before = doc ? doc.getText() : "";
-    const { text: after, replaced } = setup.upsertBlock(before, block);
+    const { text: after, replaced } = setup.upsertBlock(before, block, pick.header);
     if (after === before) {
       vscode.window.showInformationMessage(`The agent instructions in ${pick.label} are already up to date.`);
       return;

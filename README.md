@@ -14,7 +14,7 @@ It works with any agent, and with any script too: the task writes a small JSON f
 
 Open the **Agent Progress** panel (next to the terminal, or click the status bar). While nothing runs, it shows two buttons:
 
-- **Add agent instructions**: adds a short section to the file your AI agent reads (`CLAUDE.md` for Claude Code, `AGENTS.md` for Codex, Copilot, Cursor and most others, or your global `~/.claude/CLAUDE.md`), or copies it. It tells the agent to run its long commands through `agent-progress`. Before anything is written, the change shows side by side with your file, and you click **Add** or **Cancel** (in the panel, or the check and cross above the preview; closing the preview cancels); the rest of the file is left as it is, and Ctrl+Z in the editor undoes it. Clicking it again updates the section instead of adding a second one.
+- **Add agent instructions**: adds a short section to the file your AI agent reads, or copies it. The list offers `CLAUDE.md` (Claude Code), `AGENTS.md` (Codex, Copilot, Cursor and most others), `.cursor/rules/agent-progress.mdc` (a Cursor rule applied in every chat), `.github/copilot-instructions.md` (GitHub Copilot), `GEMINI.md` (Gemini CLI) and your global `~/.claude/CLAUDE.md`. It tells the agent to run its long commands through `agent-progress`. Before anything is written, the change shows side by side with your file, and you click **Add** or **Cancel** (in the panel, or the check and cross above the preview; closing the preview cancels); the rest of the file is left as it is, and Ctrl+Z in the editor undoes it. Clicking it again updates the section instead of adding a second one.
 - **How it works**: a short guide to show any command or script in the panel, without an AI agent.
 
 ## What you see

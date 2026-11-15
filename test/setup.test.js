@@ -45,6 +45,25 @@ test("the edit touches only the agent section", () => {
   assert.deepEqual(setup.changedRange("same", "same"), { start: 4, end: 4, text: "" });
 });
 
+test("a new Cursor rule starts with its header, an existing one keeps its own", () => {
+  const block = setup.instructions(null);
+  const created = setup.upsertBlock("", block, setup.CURSOR_RULE_HEADER).text;
+  assert.match(created, /^---\ndescription: .+\nalwaysApply: true\n---\n<!-- agent-progress:start -->/);
+  const own = "---\ndescription: my rules\nalwaysApply: false\n---\nBe brief.\n";
+  const added = setup.upsertBlock(own, block, setup.CURSOR_RULE_HEADER).text;
+  assert.equal(added.startsWith(own), true, "the existing header and rules stay first, untouched");
+  assert.equal(added.split("alwaysApply").length, 2, "no second header");
+});
+
+test("every target names a file and says who reads it", () => {
+  const labels = setup.TARGETS.map((t) => t.label);
+  assert.deepEqual(labels.slice(0, 2), ["CLAUDE.md", "AGENTS.md"]);
+  for (const t of setup.TARGETS) {
+    assert.ok(t.description && t.path.length, t.label);
+    assert.equal(t.path.join("/"), t.label.replace(/^~\//, ""), `${t.label}: the label is the path`);
+  }
+});
+
 test("a file with Windows line endings keeps them", () => {
   const out = setup.upsertBlock("# Rules\r\n", setup.instructions(null)).text;
   assert.equal(out.replace(/\r\n/g, "").includes("\n"), false, "no bare \\n added");

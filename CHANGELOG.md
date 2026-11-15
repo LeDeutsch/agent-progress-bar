@@ -2,6 +2,7 @@
 
 ## 0.1.0
 
+- **Add agent instructions** also offers Cursor (`.cursor/rules/agent-progress.mdc`, applied in every chat), GitHub Copilot (`.github/copilot-instructions.md`) and Gemini CLI (`GEMINI.md`).
 - The empty panel offers **Add agent instructions** (adds or updates a section in `CLAUDE.md`, `AGENTS.md` or `~/.claude/CLAUDE.md`, or copies it; the change shows side by side first, nothing is written before **Add**, in the panel or above the preview, and Ctrl+Z undoes it) and **How it works** (a short guide for using the panel without an AI agent).
 - The `agent-progress` command: `run` wraps any command (card, log, done or failed at the end, progress read from the output with `--parse`); `set`, `done`, `fail`, `remove` report progress without writing JSON. Launchers in `~/.agent-progress/bin` run it with VS Code's own runtime (no Node.js needed); that folder is on the PATH of VS Code's terminals.
 - The panel lives next to the terminal (it was an editor tab), cards side by side when there is room, colors from the theme (light, dark, high contrast checked).
