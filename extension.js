@@ -1,6 +1,6 @@
 "use strict";
-// Task Progress Bar: watches a folder of small JSON files written by long background tasks
-// (an AI agent, a script...) and shows their progress and time left in the status bar, with
+// Agent Progress Bar: watches a folder of small JSON files written by long background tasks
+// (run by an AI agent, a script...) and shows their progress and time left in the status bar, with
 // a panel of progress bars. Reads local files only; never touches the network.
 
 const vscode = require("vscode");
@@ -20,8 +20,8 @@ const lastState = new Map();
 const lastGood = new Map();
 
 function settings() {
-  const config = vscode.workspace.getConfiguration("taskProgress");
-  const folder = config.get("folder") || path.join(os.homedir(), ".task-progress");
+  const config = vscode.workspace.getConfiguration("agentProgress");
+  const folder = config.get("folder") || path.join(os.homedir(), ".agent-progress");
   return {
     folder,
     staleMinutes: config.get("staleMinutes", 10),
@@ -152,7 +152,7 @@ function showPanel() {
     panel.reveal();
     return;
   }
-  panel = vscode.window.createWebviewPanel("taskProgress", "Task Progress", vscode.ViewColumn.Beside, {
+  panel = vscode.window.createWebviewPanel("agentProgress", "Agent Progress", vscode.ViewColumn.Beside, {
     enableScripts: true,
     localResourceRoots: [],
   });
@@ -186,15 +186,15 @@ function openFolder() {
 
 function activate(context) {
   statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  statusItem.name = "Task Progress";
-  statusItem.command = "taskProgress.showPanel";
+  statusItem.name = "Agent Progress";
+  statusItem.command = "agentProgress.showPanel";
   context.subscriptions.push(
     statusItem,
-    vscode.commands.registerCommand("taskProgress.showPanel", showPanel),
-    vscode.commands.registerCommand("taskProgress.clearFinished", clearFinished),
-    vscode.commands.registerCommand("taskProgress.openFolder", openFolder),
+    vscode.commands.registerCommand("agentProgress.showPanel", showPanel),
+    vscode.commands.registerCommand("agentProgress.clearFinished", clearFinished),
+    vscode.commands.registerCommand("agentProgress.openFolder", openFolder),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("taskProgress")) refresh();
+      if (e.affectsConfiguration("agentProgress")) refresh();
     }),
   );
   // Polling a small folder once a second is cheap and works the same everywhere.

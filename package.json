@@ -1,19 +1,19 @@
 {
-  "name": "task-progress-bar",
-  "displayName": "Task Progress Bar",
-  "description": "See how far a long background task has got, and how long is left, right in the status bar. Any AI agent or script can report its progress by writing a small JSON file.",
+  "name": "agent-progress-bar",
+  "displayName": "Agent Progress Bar",
+  "description": "A progress bar and the time left, in the status bar, for the long tasks your AI agents run in the background. Any agent or script reports its progress by writing a small JSON file.",
   "version": "0.1.0",
   "publisher": "ludwigdinspel",
   "author": "Ludwig Junior Dinspel",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/LeDeutsch/task-progress-bar.git"
+    "url": "https://github.com/LeDeutsch/agent-progress-bar.git"
   },
   "bugs": {
-    "url": "https://github.com/LeDeutsch/task-progress-bar/issues"
+    "url": "https://github.com/LeDeutsch/agent-progress-bar/issues"
   },
-  "homepage": "https://github.com/LeDeutsch/task-progress-bar#readme",
+  "homepage": "https://github.com/LeDeutsch/agent-progress-bar#readme",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.90.0"
@@ -23,12 +23,13 @@
     "Visualization"
   ],
   "keywords": [
+    "ai agent",
+    "agent",
     "progress",
     "progress bar",
     "time remaining",
     "eta",
     "background task",
-    "agent",
     "ai"
   ],
   "activationEvents": [
@@ -38,42 +39,42 @@
   "contributes": {
     "commands": [
       {
-        "command": "taskProgress.showPanel",
+        "command": "agentProgress.showPanel",
         "title": "Show Panel",
-        "category": "Task Progress"
+        "category": "Agent Progress"
       },
       {
-        "command": "taskProgress.clearFinished",
+        "command": "agentProgress.clearFinished",
         "title": "Clear Finished Tasks",
-        "category": "Task Progress"
+        "category": "Agent Progress"
       },
       {
-        "command": "taskProgress.openFolder",
+        "command": "agentProgress.openFolder",
         "title": "Open Progress Folder",
-        "category": "Task Progress"
+        "category": "Agent Progress"
       }
     ],
     "configuration": {
-      "title": "Task Progress Bar",
+      "title": "Agent Progress Bar",
       "properties": {
-        "taskProgress.folder": {
+        "agentProgress.folder": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Folder watched for progress files. Empty: `~/.task-progress`."
+          "markdownDescription": "Folder watched for progress files. Empty: `~/.agent-progress`."
         },
-        "taskProgress.staleMinutes": {
+        "agentProgress.staleMinutes": {
           "type": "number",
           "default": 10,
           "minimum": 1,
           "description": "A running task with no update for this many minutes is shown as stalled."
         },
-        "taskProgress.keepFinishedMinutes": {
+        "agentProgress.keepFinishedMinutes": {
           "type": "number",
           "default": 5,
           "minimum": 0,
           "description": "How many minutes a finished or failed task stays visible."
         },
-        "taskProgress.notify": {
+        "agentProgress.notify": {
           "type": "boolean",
           "default": true,
           "description": "Show a notification when a task finishes or fails."

@@ -1,8 +1,8 @@
-# Task Progress Bar
+# Agent Progress Bar
 
-When an AI agent (or any script) starts something long in the background, you usually get no sign of life until it is over. This extension gives you one: a progress bar and the time left, in the VS Code status bar, with a panel of bars when you click it.
+When an AI agent starts something long in the background (a build, a big batch of files, model work...), you usually get no sign of life until it is over. This extension gives you one: a progress bar and the time left, in the VS Code status bar, with a panel of bars when you click it.
 
-It works with anything that can write a file. The task writes a small JSON file, the extension reads it once a second. That's the whole contract.
+It works with any agent, and with any script too: the task writes a small JSON file, the extension reads it once a second. That's the whole contract.
 
 ## Install
 
@@ -19,7 +19,7 @@ It works with anything that can write a file. The task writes a small JSON file,
 
 ## Reporting progress
 
-Write one JSON file per task in `~/.task-progress/` (on Windows: `C:\Users\<you>\.task-progress\`). The file name is the task id: `voice-packs.json`. Rewrite it as the task moves on.
+Write one JSON file per task in `~/.agent-progress/` (on Windows: `C:\Users\<you>\.agent-progress\`). The file name is the task id: `voice-packs.json`. Rewrite it as the task moves on.
 
 ```json
 {
@@ -47,7 +47,7 @@ Write one JSON file per task in `~/.task-progress/` (on Windows: `C:\Users\<you>
 
 Without `done`/`total` or `percent`, the bar just moves to show the task is alive. Write the file in one go (write to a temporary file, then rename) so it is never read half-written; if it is, the extension keeps the previous value.
 
-When the task ends, set `"state": "done"` (or `"failed"`). Finished tasks disappear after 5 minutes, or with the command **Task Progress: Clear Finished Tasks**, which deletes their files.
+When the task ends, set `"state": "done"` (or `"failed"`). Finished tasks disappear after 5 minutes, or with the command **Agent Progress: Clear Finished Tasks**, which deletes their files.
 
 ### Examples
 
@@ -57,7 +57,7 @@ Python:
 import json, os, time
 from pathlib import Path
 
-folder = Path.home() / ".task-progress"
+folder = Path.home() / ".agent-progress"
 folder.mkdir(exist_ok=True)
 started = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
@@ -72,7 +72,7 @@ Node:
 
 ```js
 const fs = require("fs"), os = require("os"), path = require("path");
-const folder = path.join(os.homedir(), ".task-progress");
+const folder = path.join(os.homedir(), ".agent-progress");
 fs.mkdirSync(folder, { recursive: true });
 const started = new Date().toISOString();
 function report(done, total, state = "running") {
@@ -86,7 +86,7 @@ function report(done, total, state = "running") {
 
 Add this to the instructions your agent reads (for example `CLAUDE.md` or `AGENTS.md`):
 
-> When you start a task that runs in the background for more than a minute, report its progress in `~/.task-progress/<task-id>.json` with `title`, `done`, `total`, `started` (ISO 8601) and `state` (`running`, then `done` or `failed`), as described in the Task Progress Bar README. Update it at least every few seconds and write it atomically (temporary file, then rename).
+> When you start a task that runs in the background for more than a minute, report its progress in `~/.agent-progress/<task-id>.json` with `title`, `done`, `total`, `started` (ISO 8601) and `state` (`running`, then `done` or `failed`), as described in the Agent Progress Bar README. Update it at least every few seconds and write it atomically (temporary file, then rename).
 
 If the task's own program cannot be changed, the agent can run a small watcher next to it that reads the task's log and writes the file.
 
@@ -94,10 +94,10 @@ If the task's own program cannot be changed, the agent can run a small watcher n
 
 | Setting | Default | |
 |---|---|---|
-| `taskProgress.folder` | `~/.task-progress` | Folder watched for progress files. |
-| `taskProgress.staleMinutes` | `10` | No update for this long: shown as stalled. |
-| `taskProgress.keepFinishedMinutes` | `5` | How long a finished task stays visible. |
-| `taskProgress.notify` | `true` | Notification when a task finishes or fails. |
+| `agentProgress.folder` | `~/.agent-progress` | Folder watched for progress files. |
+| `agentProgress.staleMinutes` | `10` | No update for this long: shown as stalled. |
+| `agentProgress.keepFinishedMinutes` | `5` | How long a finished task stays visible. |
+| `agentProgress.notify` | `true` | Notification when a task finishes or fails. |
 
 ## Privacy
 
