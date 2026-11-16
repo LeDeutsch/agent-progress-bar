@@ -36,7 +36,9 @@ Open the **Agent Progress** panel (next to the terminal, or click the status bar
 
 ## Try it
 
-From the source folder, `npm run demo` writes a few fake tasks for 90 seconds: a count with the time left and a log, several tasks at once, a task with no known progress, a failure, a stalled task. Watch the status bar and click it.
+In the extension's settings, click **Show demo tasks** (or run **Agent Progress: Show or Hide Demo Tasks** from the Command Palette). Four made-up tasks show in the panel and the status bar for a minute: a build with a count and the time left, a model training with a percentage, a stalled task, and tests that end after 20 seconds with their notification. They live in memory only: nothing is written to the progress folder. Click again to hide them.
+
+From the source folder, `npm run demo` does the same with real progress files for 90 seconds, plus a log, a task with no known progress and a failure.
 
 ## The `agent-progress` command
 
@@ -183,6 +185,7 @@ Click the gear at the top of the **Agent Progress** panel, or press `Ctrl+,` (`C
 | `agentProgress.deleteFilesAfterHours` | `24` | Progress files with no update for this long are deleted. `0`: never. |
 | `agentProgress.notify` | `true` | Notification when a task finishes or fails. |
 | `agentProgress.commandsShowAfterSeconds` | `20` | With an agent connected, a command shows once it has lasted this long. |
+| `agentProgress.demoSeconds` | `60` | How long the demo tasks stay. Its description holds the **Show demo tasks** link. |
 
 ## Privacy
 

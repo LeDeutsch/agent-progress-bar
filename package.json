@@ -2,7 +2,7 @@
   "name": "agent-progress-bar",
   "displayName": "Agent Progress Bar",
   "description": "A progress bar and the time left for the long tasks your AI agents run in the background, in the status bar and in a panel next to the terminal. Connects to Claude Code, Codex, GitHub Copilot and Gemini CLI; works with any agent, command or script.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "ludwigdinspel",
   "author": "Ludwig Junior Dinspel",
   "license": "MIT",
@@ -91,6 +91,12 @@
         "title": "How It Works",
         "category": "Agent Progress",
         "icon": "$(question)"
+      },
+      {
+        "command": "agentProgress.demo",
+        "title": "Show or Hide Demo Tasks",
+        "category": "Agent Progress",
+        "icon": "$(beaker)"
       },
       {
         "command": "agentProgress.confirmAdd",
@@ -246,6 +252,12 @@
           "type": "boolean",
           "default": true,
           "description": "Show a notification when a task finishes or fails."
+        },
+        "agentProgress.demoSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 10,
+          "markdownDescription": "[Show demo tasks](command:agentProgress.demo): four made-up tasks in the panel for this many seconds, one for each thing it shows (a count with the time left, a percentage, a stalled task, a task that ends). Nothing is written to the progress folder. Click again to hide them."
         },
         "agentProgress.deleteFilesAfterHours": {
           "type": "number",

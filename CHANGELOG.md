@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- **Show demo tasks**: a link in the extension's settings (and **Agent Progress: Show or Hide Demo Tasks** in the Command Palette) puts four made-up tasks in the panel and the status bar for a minute, one for each thing they show: a count with the time left, a percentage with the task's own estimate, a stalled task, and tests that end with their notification. They live in memory only, never in the progress folder; Remove works on them as on real tasks, and a second click hides them all. Setting `agentProgress.demoSeconds` for how long they stay.
+
 ## 0.3.0
 
 - **Codex, GitHub Copilot and Gemini CLI** connect like Claude Code: hooks in their own settings show every command they run that lasts. Codex: `~/.codex/hooks.json` (Codex asks once to trust the hook: `/hooks`). GitHub Copilot: a file of the extension's own, `~/.copilot/hooks/agent-progress.json`, read by Copilot CLI and VS Code's agent mode; Disconnect deletes it. Gemini CLI: `~/.gemini/settings.json`. Each change shows side by side first.

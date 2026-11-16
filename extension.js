@@ -12,6 +12,7 @@ const { panelHtml } = require("./lib/panel");
 const setup = require("./lib/setup");
 const claude = require("./lib/claude");
 const agents = require("./lib/agents");
+const demo = require("./lib/demo");
 const { AGENTS: hookAgents } = require("./lib/hook");
 
 const REFRESH_MS = 1000;
@@ -41,6 +42,7 @@ function settings() {
     keepFinishedMinutes: config.get("keepFinishedMinutes", progress.KEEP_FINISHED_MINUTES),
     deleteAfterHours: config.get("deleteFilesAfterHours", 24),
     showAfterSeconds: config.get("commandsShowAfterSeconds", 20),
+    demoSeconds: config.get("demoSeconds", demo.DEMO_SECONDS),
   };
 }
 
@@ -116,7 +118,7 @@ function notifyEnds(tasks) {
 function refresh() {
   const now = Date.now();
   const { staleMinutes, keepFinishedMinutes } = settings();
-  const tasks = readTasks(now);
+  const tasks = [...readTasks(now), ...demoNow(now)];
   notifyEnds(tasks);
   const text = progress.statusText(tasks, now, staleMinutes);
   if (text) {
@@ -176,6 +178,51 @@ function forget(id) {
   lastGood.delete(id);
   lastState.delete(id);
   history.delete(id);
+}
+
+/** When the demo started (ms), or null. Its tasks live in memory only, never in the folder. */
+let demoStart = null;
+/** Demo tasks taken off the list by hand (Remove, Clear Finished) before the demo ends. */
+const demoHidden = new Set();
+
+/** Shows the demo tasks in the panel, or takes them away when they are already there. */
+function toggleDemo() {
+  if (demoStart !== null) {
+    stopDemo();
+  } else {
+    demoStart = Date.now();
+    showPanel();
+  }
+  refresh();
+}
+
+function stopDemo() {
+  for (const id of [...history.keys(), ...lastState.keys()]) if (demo.isDemo(id)) forget(id);
+  demoStart = null;
+  demoHidden.clear();
+}
+
+/**
+ * The demo tasks to show now, with their readings for the time left, like the tasks read from the
+ * folder; the demo stops by itself at the end.
+ */
+function demoNow(now) {
+  if (demoStart === null) return [];
+  const { staleMinutes, keepFinishedMinutes, demoSeconds } = settings();
+  const tasks = demo.demoTasks(demoStart, now, { seconds: demoSeconds, staleMinutes });
+  if (!tasks.length) {
+    stopDemo();
+    return [];
+  }
+  const shown = [];
+  for (const task of tasks) {
+    if (demoHidden.has(task.id)) continue;
+    task.samples = progress.addSample(history.get(task.id) || [], task, now);
+    history.set(task.id, task.samples);
+    if (task.state !== "running" && now - task.updated > keepFinishedMinutes * 60000) continue;
+    shown.push(task);
+  }
+  return shown;
 }
 
 /** Deletes a task's progress file. Running tasks are left alone: they would come back. */
@@ -636,6 +683,17 @@ function onViewMessage(message) {
   if (message.cmd === "guide") return howItWorks();
   if (message.cmd === "confirm") return pending?.settle("ok");
   if (message.cmd === "cancel") return pending?.settle("cancel");
+  // A demo task has no file and no log: Remove only takes it off the list, and like a real task,
+  // only once it no longer runs.
+  if (demo.isDemo(message.id)) {
+    const now = Date.now();
+    const task = demoNow(now).find((t) => t.id === message.id);
+    if (message.cmd === "remove" && task && progress.kindOf(task, now, settings().staleMinutes) !== "running") {
+      demoHidden.add(message.id);
+      refresh();
+    }
+    return;
+  }
   // Only ids read from the folder are accepted.
   const task = typeof message.id === "string" ? lastGood.get(message.id) : undefined;
   if (!task) return;
@@ -670,6 +728,9 @@ function clearFinished() {
   for (const task of readTasks(now)) {
     if (task.state !== "running") removeTask(task, now);
   }
+  for (const task of demoNow(now)) {
+    if (task.state !== "running") demoHidden.add(task.id);
+  }
   refresh();
 }
 
@@ -699,6 +760,7 @@ function activate(context) {
       provideTextDocumentContent: (uri) => previews.get(uri.path) ?? "",
     }),
     vscode.commands.registerCommand("agentProgress.howItWorks", howItWorks),
+    vscode.commands.registerCommand("agentProgress.demo", toggleDemo),
     vscode.commands.registerCommand("agentProgress.openSettings", openSettings),
     vscode.commands.registerCommand("agentProgress.besideTerminal", toggleBesideTerminal),
     vscode.commands.registerCommand("agentProgress.ownTab", toggleBesideTerminal),
